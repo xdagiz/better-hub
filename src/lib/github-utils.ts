@@ -1,0 +1,315 @@
+/**
+ * Deduplicates an array of user-like objects into unique participants by login.
+ */
+export function extractParticipants(
+  users: ({ login: string; avatar_url: string } | null | undefined)[]
+): { login: string; avatar_url: string }[] {
+  const seen = new Set<string>();
+  const result: { login: string; avatar_url: string }[] = [];
+  for (const u of users) {
+    if (u && !seen.has(u.login)) {
+      seen.add(u.login);
+      result.push({ login: u.login, avatar_url: u.avatar_url });
+    }
+  }
+  return result;
+}
+
+export function parseRefAndPath(
+  pathSegments: string[],
+  branchNames: string[]
+): { ref: string; path: string } {
+  // Sort branches by length (longest first) for greedy matching
+  const sorted = [...branchNames].sort((a, b) => b.length - a.length);
+  const joined = pathSegments.join("/");
+
+  for (const branch of sorted) {
+    const branchParts = branch.split("/");
+    if (pathSegments.length >= branchParts.length) {
+      const candidate = pathSegments.slice(0, branchParts.length).join("/");
+      if (candidate === branch) {
+        const remaining = pathSegments.slice(branchParts.length).join("/");
+        return { ref: branch, path: remaining };
+      }
+    }
+  }
+
+  // Default: first segment is the ref
+  return { ref: pathSegments[0] || "main", path: pathSegments.slice(1).join("/") };
+}
+
+export function toInternalUrl(htmlUrl: string): string {
+  const parsed = parseGitHubUrl(htmlUrl);
+  if (!parsed) return htmlUrl;
+
+  const { owner, repo, type, number, path } = parsed;
+  const base = `/repos/${owner}/${repo}`;
+
+  if (type === "pull") return `${base}/pulls/${number}`;
+  if (type === "issue") return `${base}/issues/${number}`;
+  if (type === "tree" && path) return `${base}/tree/${path}`;
+  if (type === "blob" && path) return `${base}/blob/${path}`;
+  if (type === "repo") return base;
+
+  return htmlUrl;
+}
+
+/**
+ * Converts a github.com URL to a full app URL using NEXT_PUBLIC_APP_URL.
+ * Falls back to toInternalUrl (relative path) if env is not set.
+ */
+export function toAppUrl(htmlUrl: string): string {
+  const internalPath = toInternalUrl(htmlUrl);
+  // If toInternalUrl returned the original URL (couldn't parse), keep it
+  if (internalPath === htmlUrl) return htmlUrl;
+  const appBase = process.env.NEXT_PUBLIC_APP_URL;
+  if (appBase) return `${appBase.replace(/\/$/, "")}${internalPath}`;
+  return internalPath;
+}
+
+export function parseGitHubUrl(
+  htmlUrl: string
+): {
+  owner: string;
+  repo: string;
+  type: "repo" | "pull" | "issue" | "tree" | "blob";
+  number?: number;
+  path?: string;
+} | null {
+  try {
+    const url = new URL(htmlUrl);
+    if (url.hostname !== "github.com") return null;
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) return null;
+
+    const [owner, repo, ...rest] = parts;
+
+    if (rest.length === 0) return { owner, repo, type: "repo" };
+    if (rest[0] === "pull" && rest[1])
+      return { owner, repo, type: "pull", number: parseInt(rest[1], 10) };
+    if (rest[0] === "issues" && rest[1])
+      return { owner, repo, type: "issue", number: parseInt(rest[1], 10) };
+    if (rest[0] === "tree")
+      return { owner, repo, type: "tree", path: rest.slice(1).join("/") };
+    if (rest[0] === "blob")
+      return { owner, repo, type: "blob", path: rest.slice(1).join("/") };
+
+    return { owner, repo, type: "repo" };
+  } catch {
+    return null;
+  }
+}
+
+const extensionMap: Record<string, string> = {
+  ts: "typescript",
+  tsx: "tsx",
+  js: "javascript",
+  jsx: "jsx",
+  mjs: "javascript",
+  cjs: "javascript",
+  py: "python",
+  rb: "ruby",
+  rs: "rust",
+  go: "go",
+  java: "java",
+  kt: "kotlin",
+  swift: "swift",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  hpp: "cpp",
+  cs: "csharp",
+  php: "php",
+  vue: "vue",
+  svelte: "svelte",
+  html: "html",
+  htm: "html",
+  css: "css",
+  scss: "scss",
+  less: "less",
+  json: "json",
+  yaml: "yaml",
+  yml: "yaml",
+  toml: "toml",
+  xml: "xml",
+  md: "markdown",
+  mdx: "mdx",
+  sql: "sql",
+  sh: "shellscript",
+  bash: "shellscript",
+  zsh: "shellscript",
+  dockerfile: "dockerfile",
+  docker: "dockerfile",
+  makefile: "makefile",
+  graphql: "graphql",
+  gql: "graphql",
+  lua: "lua",
+  r: "r",
+  dart: "dart",
+  zig: "zig",
+  ex: "elixir",
+  exs: "elixir",
+  erl: "erlang",
+  hs: "haskell",
+  ml: "ocaml",
+  clj: "clojure",
+  scala: "scala",
+  tf: "hcl",
+  prisma: "prisma",
+  proto: "proto",
+  ini: "ini",
+  conf: "ini",
+  env: "shellscript",
+};
+
+export function getLanguageFromFilename(filename: string): string {
+  const lower = filename.toLowerCase();
+  const basename = lower.split("/").pop() || lower;
+
+  // Special filenames
+  if (basename === "dockerfile") return "dockerfile";
+  if (basename === "makefile") return "makefile";
+  if (basename.endsWith(".d.ts")) return "typescript";
+
+  const ext = basename.split(".").pop() || "";
+  return extensionMap[ext] || "text";
+}
+
+export interface DiffSegment {
+  text: string;
+  highlight: boolean;
+}
+
+export interface DiffLine {
+  type: "add" | "remove" | "context" | "header";
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+  segments?: DiffSegment[];
+}
+
+function computeWordDiff(oldStr: string, newStr: string): { oldSegments: DiffSegment[]; newSegments: DiffSegment[] } {
+  // Find common prefix
+  let prefixLen = 0;
+  while (prefixLen < oldStr.length && prefixLen < newStr.length && oldStr[prefixLen] === newStr[prefixLen]) {
+    prefixLen++;
+  }
+  // Find common suffix
+  let suffixLen = 0;
+  while (
+    suffixLen < oldStr.length - prefixLen &&
+    suffixLen < newStr.length - prefixLen &&
+    oldStr[oldStr.length - 1 - suffixLen] === newStr[newStr.length - 1 - suffixLen]
+  ) {
+    suffixLen++;
+  }
+
+  const prefix = oldStr.slice(0, prefixLen);
+  const oldMiddle = oldStr.slice(prefixLen, oldStr.length - suffixLen);
+  const newMiddle = newStr.slice(prefixLen, newStr.length - suffixLen);
+  const suffix = oldStr.slice(oldStr.length - suffixLen);
+
+  const oldSegments: DiffSegment[] = [];
+  const newSegments: DiffSegment[] = [];
+
+  if (prefix) { oldSegments.push({ text: prefix, highlight: false }); newSegments.push({ text: prefix, highlight: false }); }
+  if (oldMiddle) oldSegments.push({ text: oldMiddle, highlight: true });
+  if (newMiddle) newSegments.push({ text: newMiddle, highlight: true });
+  if (suffix) { oldSegments.push({ text: suffix, highlight: false }); newSegments.push({ text: suffix, highlight: false }); }
+
+  return { oldSegments, newSegments };
+}
+
+export function parseDiffPatch(patch: string): DiffLine[] {
+  if (!patch) return [];
+  const lines = patch.split("\n");
+  const raw: DiffLine[] = [];
+  let oldLine = 0;
+  let newLine = 0;
+
+  for (const line of lines) {
+    if (line.startsWith("@@")) {
+      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        oldLine = parseInt(match[1], 10);
+        newLine = parseInt(match[2], 10);
+      }
+      raw.push({ type: "header", content: line });
+    } else if (line.startsWith("+")) {
+      raw.push({ type: "add", content: line.slice(1), newLineNumber: newLine });
+      newLine++;
+    } else if (line.startsWith("-")) {
+      raw.push({ type: "remove", content: line.slice(1), oldLineNumber: oldLine });
+      oldLine++;
+    } else {
+      raw.push({
+        type: "context",
+        content: line.startsWith(" ") ? line.slice(1) : line,
+        oldLineNumber: oldLine,
+        newLineNumber: newLine,
+      });
+      oldLine++;
+      newLine++;
+    }
+  }
+
+  // Second pass: pair consecutive remove/add blocks for word-level highlighting
+  const result: DiffLine[] = [];
+  let i = 0;
+  while (i < raw.length) {
+    if (raw[i].type === "remove") {
+      const removes: DiffLine[] = [];
+      while (i < raw.length && raw[i].type === "remove") { removes.push(raw[i]); i++; }
+      const adds: DiffLine[] = [];
+      while (i < raw.length && raw[i].type === "add") { adds.push(raw[i]); i++; }
+
+      // Pair up for word-level diff
+      const pairCount = Math.min(removes.length, adds.length);
+      for (let j = 0; j < pairCount; j++) {
+        const { oldSegments, newSegments } = computeWordDiff(removes[j].content, adds[j].content);
+        removes[j].segments = oldSegments;
+        adds[j].segments = newSegments;
+      }
+
+      result.push(...removes, ...adds);
+    } else {
+      result.push(raw[i]);
+      i++;
+    }
+  }
+
+  return result;
+}
+
+export function parseHunkHeader(content: string): {
+  oldStart: number;
+  oldCount: number;
+  newStart: number;
+  newCount: number;
+} | null {
+  const match = content.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+  if (!match) return null;
+  return {
+    oldStart: parseInt(match[1], 10),
+    oldCount: match[2] !== undefined ? parseInt(match[2], 10) : 1,
+    newStart: parseInt(match[3], 10),
+    newCount: match[4] !== undefined ? parseInt(match[4], 10) : 1,
+  };
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+/** Encode file path segments that Next.js Link would interpret as dynamic routes */
+export function encodeFilePath(path: string): string {
+  return path
+    .split("/")
+    .map((s) => s.replace(/\[/g, "%5B").replace(/\]/g, "%5D").replace(/\(/g, "%28").replace(/\)/g, "%29"))
+    .join("/");
+}

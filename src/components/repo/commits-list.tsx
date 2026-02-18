@@ -1,0 +1,245 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { cn, timeAgo } from "@/lib/utils";
+import { fetchCommitsByDate } from "@/app/(app)/repos/[owner]/[repo]/commits/actions";
+
+type Commit = {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      name?: string | null;
+      date?: string | null;
+    } | null;
+  };
+  author: {
+    login: string;
+    avatar_url: string;
+  } | null;
+  html_url: string;
+};
+
+interface CommitsListProps {
+  owner: string;
+  repo: string;
+  commits: Commit[];
+  defaultBranch: string;
+}
+
+function groupByDate(commits: Commit[]) {
+  const groups: Record<string, Commit[]> = {};
+  for (const commit of commits) {
+    const date = commit.commit.author?.date;
+    const key = date
+      ? new Date(date).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "Unknown date";
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(commit);
+  }
+  return Object.entries(groups);
+}
+
+export function CommitsList({
+  owner,
+  repo,
+  commits,
+  defaultBranch,
+}: CommitsListProps) {
+  const [search, setSearch] = useState("");
+  const [copiedSha, setCopiedSha] = useState<string | null>(null);
+  const [since, setSince] = useState("");
+  const [until, setUntil] = useState("");
+  const [displayedCommits, setDisplayedCommits] = useState<Commit[]>(commits);
+  const [isPending, startTransition] = useTransition();
+
+  const hasDateFilter = since !== "" || until !== "";
+
+  const handleDateChange = (newSince: string, newUntil: string) => {
+    if (!newSince && !newUntil) {
+      setDisplayedCommits(commits);
+      return;
+    }
+    startTransition(async () => {
+      const result = await fetchCommitsByDate(
+        owner,
+        repo,
+        newSince ? new Date(newSince).toISOString() : undefined,
+        newUntil ? new Date(newUntil + "T23:59:59").toISOString() : undefined
+      );
+      setDisplayedCommits(result as Commit[]);
+    });
+  };
+
+  const clearDates = () => {
+    setSince("");
+    setUntil("");
+    setDisplayedCommits(commits);
+  };
+
+  const filtered = search
+    ? displayedCommits.filter((c) =>
+        c.commit.message.toLowerCase().includes(search.toLowerCase())
+      )
+    : displayedCommits;
+
+  const grouped = groupByDate(filtered);
+
+  const copySha = (sha: string) => {
+    navigator.clipboard.writeText(sha);
+    setCopiedSha(sha);
+    setTimeout(() => setCopiedSha(null), 2000);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Search commits..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 pl-9 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </div>
+        <input
+          type="date"
+          value={since}
+          onChange={(e) => {
+            setSince(e.target.value);
+            handleDateChange(e.target.value, until);
+          }}
+          title="Since date"
+          className="rounded-md border border-border bg-background px-2 py-2 font-mono text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <input
+          type="date"
+          value={until}
+          onChange={(e) => {
+            setUntil(e.target.value);
+            handleDateChange(since, e.target.value);
+          }}
+          title="Until date"
+          className="rounded-md border border-border bg-background px-2 py-2 font-mono text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        {hasDateFilter && (
+          <button
+            onClick={clearDates}
+            title="Clear date filters"
+            className="rounded-md border border-border bg-background px-2 py-2 text-xs text-muted-foreground transition-colors hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-800 cursor-pointer"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {isPending && (
+        <div className="py-4 text-center text-xs text-muted-foreground">
+          Loading commits...
+        </div>
+      )}
+
+      {!isPending && grouped.length === 0 && (
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          No commits found.
+        </div>
+      )}
+
+      {grouped.map(([date, dateCommits]) => (
+        <div key={date}>
+          <p className="mb-2 text-[11px] font-mono uppercase tracking-wider text-muted-foreground/70">
+            Commits on {date}
+          </p>
+          <div className="overflow-hidden rounded-md border border-border">
+            {dateCommits.map((commit, i) => {
+              const firstLine = commit.commit.message.split("\n")[0];
+              const login = commit.author?.login;
+              const avatarUrl = commit.author?.avatar_url;
+              const shortSha = commit.sha.slice(0, 7);
+
+              return (
+                <div
+                  key={commit.sha}
+                  className={cn(
+                    "flex items-start gap-3 px-4 py-3",
+                    i > 0 && "border-t border-border"
+                  )}
+                >
+                  {avatarUrl ? (
+                    <Link
+                      href={`/repos/${login}`}
+                      className="mt-0.5 shrink-0"
+                    >
+                      <Image
+                        src={avatarUrl}
+                        alt={login ?? ""}
+                        width={24}
+                        height={24}
+                        className="rounded-full"
+                      />
+                    </Link>
+                  ) : (
+                    <div className="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-muted" />
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/repos/${owner}/${repo}/commits/${commit.sha}`}
+                      className="text-sm font-medium text-foreground hover:text-blue-600 dark:hover:text-blue-400 line-clamp-1"
+                    >
+                      {firstLine}
+                    </Link>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {login ? (
+                        <Link
+                          href={`/repos/${login}`}
+                          className="hover:underline"
+                        >
+                          {login}
+                        </Link>
+                      ) : (
+                        commit.commit.author?.name ?? "Unknown"
+                      )}
+                      {commit.commit.author?.date && (
+                        <> · {timeAgo(commit.commit.author.date)}</>
+                      )}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => copySha(commit.sha)}
+                    title="Copy full SHA"
+                    className="mt-0.5 shrink-0 cursor-pointer rounded px-1.5 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  >
+                    {copiedSha === commit.sha ? "Copied!" : shortSha}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

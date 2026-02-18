@@ -18,6 +18,32 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Git Data Sync (local-first)
+
+The app now uses a local-first pattern for git repository data:
+
+- Reads for repository/code data are served from local SQLite cache first.
+- GitHub remains the source of truth and async sync target.
+- Stale cache entries enqueue background sync jobs and return cached data immediately.
+
+Implemented local-first endpoints:
+
+- User repositories
+- Repository metadata
+- Repository branches/tags
+- Repository tree + directory contents
+- File content + README
+
+SQLite tables used:
+
+- `github_cache_entries`
+- `github_sync_jobs`
+
+Optional config in `.env`:
+
+- `GITHUB_SYNC_DB_PATH`
+- `GITHUB_SYNC_TTL_*` values in milliseconds (see `.env.example`)
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
