@@ -272,7 +272,7 @@ export function IssueListResults({
               <span
                 className={cn(
                   "size-2 rounded-full shrink-0",
-                  issue.state === "open" ? "bg-green-500" : "bg-purple-500"
+                  issue.state === "open" ? "bg-success" : "bg-alert-important"
                 )}
               />
               <span className="text-sm text-foreground truncate flex-1">
@@ -346,8 +346,8 @@ export function PRListResults({
                   pr.draft
                     ? "bg-muted-foreground/50"
                     : pr.state === "open"
-                      ? "bg-green-500"
-                      : "bg-purple-500"
+                      ? "bg-success"
+                      : "bg-alert-important"
                 )}
               />
               <span className="text-sm text-foreground truncate flex-1">
@@ -410,7 +410,7 @@ export function NotificationListResults({
           <div key={n.id} className="px-3 py-2">
             <div className="flex items-center gap-2">
               {n.unread && (
-                <span className="size-1.5 rounded-full bg-blue-500 shrink-0" />
+                <span className="size-1.5 rounded-full bg-info shrink-0" />
               )}
               <span className="text-sm text-foreground truncate flex-1">
                 {n.subject_title}
@@ -546,7 +546,7 @@ export function ActionResult({
       className={cn(
         "flex items-center gap-2 py-1.5 px-2.5 rounded-md text-xs my-1",
         success
-          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          ? "bg-success/10 text-success"
           : "bg-destructive/10 text-destructive"
       )}
     >
@@ -758,7 +758,7 @@ export function AICommandResults({
           Ask me anything about GitHub
         </p>
         <div className="flex justify-center mb-5">
-          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+          <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
             Experimental
           </span>
         </div>

@@ -60,16 +60,16 @@ const typeIcons: Record<string, React.ReactNode> = {
 
 function getNotificationHref(notif: NotificationItem): string | null {
   const repo = notif.repository.full_name;
-  if (!notif.subject.url) return `/repos/${repo}`;
+  if (!notif.subject.url) return `/${repo}`;
   // API URLs look like https://api.github.com/repos/owner/repo/pulls/123
   const match = notif.subject.url.match(
     /repos\/[^/]+\/[^/]+\/(pulls|issues)\/(\d+)/
   );
   if (match) {
     const type = match[1] === "pulls" ? "pulls" : "issues";
-    return `/repos/${repo}/${type}/${match[2]}`;
+    return `/${repo}/${type}/${match[2]}`;
   }
-  return `/repos/${repo}`;
+  return `/${repo}`;
 }
 
 export function NotificationsContent({
@@ -141,7 +141,7 @@ export function NotificationsContent({
                 : "border-transparent text-muted-foreground hover:text-foreground/60"
             )}
           >
-            <span className="text-[9px] text-zinc-300 dark:text-zinc-700">{num}</span>
+            <span className="text-[9px] text-muted-foreground/30">{num}</span>
             {label}
           </button>
         ))}
@@ -152,10 +152,10 @@ export function NotificationsContent({
         {Object.entries(grouped).map(([repo, notifs]) => (
           <div key={repo}>
             <div className="flex items-center gap-2 mb-2 px-1">
-              <Link href={`/repos/${repo}`} className="text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors">
+              <Link href={`/${repo}`} className="text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors">
                 {repo}
               </Link>
-              <span className="text-[9px] font-mono text-muted-foreground/60 border border-zinc-200 dark:border-zinc-800 px-1 py-0.5">
+              <span className="text-[9px] font-mono text-muted-foreground/60 border border-border px-1 py-0.5">
                 {notifs.length}
               </span>
             </div>
@@ -191,7 +191,7 @@ export function NotificationsContent({
                               : notif.reason === "mention" ||
                                   notif.reason === "team_mention"
                                 ? "border-foreground/20 text-foreground/60"
-                                : "border-zinc-200 dark:border-zinc-800 text-muted-foreground"
+                                : "border-border text-muted-foreground"
                           )}
                         >
                           {reasonLabels[notif.reason] || notif.reason}
@@ -211,7 +211,7 @@ export function NotificationsContent({
 
         {filtered.length === 0 && (
           <div className="py-16 text-center">
-            <Bell className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+            <Bell className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-xs text-muted-foreground font-mono">
               {filter === "all"
                 ? "No notifications"

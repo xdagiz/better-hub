@@ -391,6 +391,13 @@ export function closeGhostTab(
   })();
 }
 
+export function renameGhostTab(userId: string, tabId: string, label: string): void {
+  const db = getDb();
+  db.prepare(
+    `UPDATE ghost_tabs SET label = ? WHERE user_id = ? AND tab_id = ?`
+  ).run(label, userId, tabId);
+}
+
 export function setActiveGhostTab(userId: string, tabId: string): void {
   const db = getDb();
   db.prepare(

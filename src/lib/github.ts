@@ -160,6 +160,40 @@ if (!globalForGithubSync.__githubSyncDrainingUsers) {
 
 const githubSyncDrainingUsers = globalForGithubSync.__githubSyncDrainingUsers;
 
+// --- Rate Limit Error ---
+
+export class GitHubRateLimitError extends Error {
+  readonly resetAt: number; // unix timestamp (seconds)
+  readonly limit: number;
+  readonly used: number;
+
+  constructor(resetAt: number, limit: number, used: number) {
+    super("GitHub API rate limit exceeded");
+    this.name = "GitHubRateLimitError";
+    this.resetAt = resetAt;
+    this.limit = limit;
+    this.used = used;
+  }
+}
+
+function isRateLimitError(error: unknown): { resetAt: number; limit: number; used: number } | null {
+  if (typeof error !== "object" || error === null) return null;
+  const status = (error as { status?: number }).status;
+  if (status !== 403 && status !== 429) return null;
+
+  const message = (error as { message?: string }).message ?? "";
+  if (!message.toLowerCase().includes("rate limit")) return null;
+
+  const response = (error as { response?: { headers?: Record<string, string> } }).response;
+  const headers = response?.headers;
+
+  const resetAt = Number(headers?.["x-ratelimit-reset"] ?? 0);
+  const limit = Number(headers?.["x-ratelimit-limit"] ?? 5000);
+  const remaining = Number(headers?.["x-ratelimit-remaining"] ?? 0);
+
+  return { resetAt: resetAt || Math.floor(Date.now() / 1000) + 3600, limit, used: limit - remaining };
+}
+
 function readEnvMs(name: string, fallbackMs: number): number {
   const raw = process.env[name];
   if (!raw) return fallbackMs;
@@ -1225,7 +1259,9 @@ async function readLocalFirstGitData<T>({
     const data = await fetchRemote(authCtx.octokit);
     upsertGithubCacheEntry(authCtx.userId, cacheKey, cacheType, data);
     return data;
-  } catch {
+  } catch (error) {
+    const rl = isRateLimitError(error);
+    if (rl) throw new GitHubRateLimitError(rl.resetAt, rl.limit, rl.used);
     enqueueGitDataSync(authCtx, jobType, cacheKey, jobPayload);
     return fallback;
   }
@@ -1814,6 +1850,70 @@ export async function getIssueComments(
     jobPayload: { owner, repo, issueNumber },
     fetchRemote: (octokit) => fetchIssueCommentsFromGitHub(octokit, owner, repo, issueNumber),
   });
+}
+
+export interface LinkedPullRequest {
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  merged: boolean;
+  user: { login: string; avatar_url: string } | null;
+  html_url: string;
+  repoOwner: string;
+  repoName: string;
+}
+
+export async function getLinkedPullRequests(
+  owner: string,
+  repo: string,
+  issueNumber: number
+): Promise<LinkedPullRequest[]> {
+  const octokit = await getOctokit();
+  if (!octokit) return [];
+
+  try {
+    const events = await octokit.paginate(
+      octokit.issues.listEventsForTimeline as any,
+      { owner, repo, issue_number: issueNumber, per_page: 100 }
+    );
+
+    const seen = new Set<string>();
+    const linkedPRs: LinkedPullRequest[] = [];
+
+    for (const event of events as any[]) {
+      if (event.event !== "cross-referenced") continue;
+      const source = event.source?.issue;
+      if (!source?.pull_request) continue;
+
+      const prRepoFullName = source.repository?.full_name as string | undefined;
+      const prKey = prRepoFullName
+        ? `${prRepoFullName}#${source.number}`
+        : `${source.number}`;
+      if (seen.has(prKey)) continue;
+      seen.add(prKey);
+
+      const [prOwner, prName] = prRepoFullName
+        ? prRepoFullName.split("/")
+        : [owner, repo];
+
+      linkedPRs.push({
+        number: source.number,
+        title: source.title,
+        state: source.state,
+        merged: !!source.pull_request.merged_at,
+        user: source.user
+          ? { login: source.user.login, avatar_url: source.user.avatar_url }
+          : null,
+        html_url: source.html_url,
+        repoOwner: prOwner,
+        repoName: prName,
+      });
+    }
+
+    return linkedPRs;
+  } catch {
+    return [];
+  }
 }
 
 export async function getRepoIssues(

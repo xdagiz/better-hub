@@ -106,7 +106,7 @@ export function EditablePRTitle({
             <button
               type="button"
               onClick={save}
-              className="p-0.5 rounded hover:bg-emerald-500/10 text-emerald-500 transition-colors cursor-pointer"
+              className="p-0.5 rounded hover:bg-success/10 text-success transition-colors cursor-pointer"
               title="Save"
             >
               <Check className="w-3.5 h-3.5" />
@@ -114,7 +114,7 @@ export function EditablePRTitle({
             <button
               type="button"
               onClick={cancel}
-              className="p-0.5 rounded hover:bg-red-500/10 text-red-400 transition-colors cursor-pointer"
+              className="p-0.5 rounded hover:bg-destructive/10 text-destructive transition-colors cursor-pointer"
               title="Cancel"
             >
               <X className="w-3.5 h-3.5" />

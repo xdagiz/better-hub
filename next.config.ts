@@ -8,6 +8,19 @@ const nextConfig: NextConfig = {
       static: 180,
     },
   },
+  async rewrites() {
+    return {
+      beforeFiles: [],
+      afterFiles: [],
+      fallback: [
+        { source: "/:owner/:repo", destination: "/repos/:owner/:repo" },
+        {
+          source: "/:owner/:repo/:path*",
+          destination: "/repos/:owner/:repo/:path*",
+        },
+      ],
+    };
+  },
   images: {
     remotePatterns: [
       {

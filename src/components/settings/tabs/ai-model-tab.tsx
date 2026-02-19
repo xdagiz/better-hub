@@ -185,7 +185,7 @@ export function AIModelTab({ settings, onUpdate }: AIModelTabProps) {
               </p>
             )}
             {testResult === "error" && (
-              <p className="mt-1.5 text-[10px] font-mono text-red-500">
+              <p className="mt-1.5 text-[10px] font-mono text-destructive">
                 Invalid key or request failed.
               </p>
             )}

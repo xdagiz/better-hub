@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { PanelLeft } from "lucide-react";
 import { type FileTreeNode } from "@/lib/file-tree";
 import { parseRefAndPath } from "@/lib/github-utils";
 import { FileExplorerTree } from "./file-explorer-tree";
@@ -19,6 +20,9 @@ interface CodeContentWrapperProps {
   children: React.ReactNode;
 }
 
+const SNAP_THRESHOLD = 100;
+const DEFAULT_WIDTH = 240;
+
 export function CodeContentWrapper({
   owner,
   repo,
@@ -29,7 +33,7 @@ export function CodeContentWrapper({
   children,
 }: CodeContentWrapperProps) {
   const pathname = usePathname();
-  const base = `/repos/${owner}/${repo}`;
+  const base = `/${owner}/${repo}`;
 
   const isCodeRoute =
     pathname === base ||
@@ -75,16 +79,27 @@ export function CodeContentWrapper({
     return { currentRef: ref, currentPath: path, pathType: type };
   }, [pathname, base, isBlobOrTree, branches, tags, defaultBranch]);
 
-  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const lastOpenWidthRef = useRef(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const collapsed = sidebarWidth === 0;
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    dragRef.current = { startX: e.clientX, startWidth: sidebarWidth };
+    const startWidth = sidebarWidth;
+    dragRef.current = { startX: e.clientX, startWidth };
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
       const delta = ev.clientX - dragRef.current.startX;
-      setSidebarWidth(Math.max(160, Math.min(480, dragRef.current.startWidth + delta)));
+      const raw = dragRef.current.startWidth + delta;
+      // Snap to closed below threshold, otherwise clamp between 160-480
+      if (raw < SNAP_THRESHOLD) {
+        setSidebarWidth(0);
+      } else {
+        const clamped = Math.max(160, Math.min(480, raw));
+        setSidebarWidth(clamped);
+      }
     };
     const onUp = () => {
       dragRef.current = null;
@@ -92,6 +107,11 @@ export function CodeContentWrapper({
       document.removeEventListener("mouseup", onUp);
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
+      // Save last open width for restore
+      setSidebarWidth((w) => {
+        if (w > 0) lastOpenWidthRef.current = w;
+        return w;
+      });
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
@@ -99,27 +119,52 @@ export function CodeContentWrapper({
     document.body.style.cursor = "col-resize";
   }, [sidebarWidth]);
 
+  const handleExpand = useCallback(() => {
+    setSidebarWidth(lastOpenWidthRef.current || DEFAULT_WIDTH);
+  }, []);
+
   return (
     <div className="flex flex-1 min-h-0">
       {showTree && (
         <>
-          <div
-            className="hidden lg:flex shrink-0 border-r border-border flex-col min-h-0 overflow-hidden"
-            style={{ width: sidebarWidth }}
-          >
-            <FileExplorerTree
-              tree={tree}
-              owner={owner}
-              repo={repo}
-              defaultBranch={defaultBranch}
-            />
-          </div>
-          <div
-            onMouseDown={handleDragStart}
-            className="hidden lg:flex w-1 shrink-0 cursor-col-resize items-center justify-center hover:bg-foreground/10 active:bg-foreground/15 transition-colors group"
-          >
-            <div className="w-[2px] h-8 rounded-full bg-border group-hover:bg-foreground/20 group-active:bg-foreground/30 transition-colors" />
-          </div>
+          {/* Collapsed toggle */}
+          {collapsed && (
+            <div className="hidden lg:flex shrink-0 flex-col items-center pt-2 px-0.5">
+              <button
+                type="button"
+                onClick={handleExpand}
+                className="p-1.5 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                title="Show file explorer"
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Sidebar */}
+          {!collapsed && (
+            <div
+              className="hidden lg:flex shrink-0 border-r border-border flex-col min-h-0 overflow-hidden"
+              style={{ width: sidebarWidth }}
+            >
+              <FileExplorerTree
+                tree={tree}
+                owner={owner}
+                repo={repo}
+                defaultBranch={defaultBranch}
+              />
+            </div>
+          )}
+
+          {/* Drag handle — only when open */}
+          {!collapsed && (
+            <div
+              onMouseDown={handleDragStart}
+              className="hidden lg:flex w-1 shrink-0 cursor-col-resize items-center justify-center hover:bg-foreground/10 active:bg-foreground/15 transition-colors group"
+            >
+              <div className="w-[2px] h-8 rounded-full bg-border group-hover:bg-foreground/20 group-active:bg-foreground/30 transition-colors" />
+            </div>
+          )}
         </>
       )}
       <div className="flex-1 min-w-0 flex flex-col min-h-0">

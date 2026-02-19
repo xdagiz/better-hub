@@ -176,7 +176,7 @@ export function CreateIssueDialog({
       );
       if (result.success && result.number) {
         setOpen(false);
-        router.push(`/repos/${owner}/${repo}/issues/${result.number}`);
+        router.push(`/${owner}/${repo}/issues/${result.number}`);
       } else {
         setError(result.error || "Failed to create issue");
       }
@@ -534,7 +534,7 @@ export function CreateIssueDialog({
                               />
                               <span className="text-[11px] flex-1 min-w-0 truncate">{l.name}</span>
                               {isSelected && (
-                                <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <Check className="w-3 h-3 text-success shrink-0" />
                               )}
                             </button>
                           );
@@ -570,7 +570,7 @@ export function CreateIssueDialog({
               {/* Footer */}
               <div className="px-4 py-2.5 border-t border-border/40 dark:border-white/5 shrink-0">
                 {error && (
-                  <div className="flex items-center gap-2 mb-2 text-[11px] text-red-500">
+                  <div className="flex items-center gap-2 mb-2 text-[11px] text-destructive">
                     <AlertCircle className="w-3 h-3 shrink-0" />
                     {error}
                   </div>

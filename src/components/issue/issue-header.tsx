@@ -1,9 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
-import { CircleDot, CheckCircle2 } from "lucide-react";
+import { CircleDot, CheckCircle2, GitPullRequest, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { CopyLinkButton } from "@/components/shared/copy-link-button";
+import type { LinkedPullRequest } from "@/lib/github";
 
 interface IssueHeaderProps {
   title: string;
@@ -15,6 +16,7 @@ interface IssueHeaderProps {
   labels: Array<{ name?: string; color?: string }>;
   owner: string;
   repo: string;
+  linkedPRs?: LinkedPullRequest[];
 }
 
 export function IssueHeader({
@@ -27,6 +29,7 @@ export function IssueHeader({
   labels,
   owner,
   repo,
+  linkedPRs,
 }: IssueHeaderProps) {
   const isOpen = state === "open";
 
@@ -41,8 +44,8 @@ export function IssueHeader({
           className={cn(
             "inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono",
             isOpen
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-purple-600 dark:text-purple-400"
+              ? "text-success"
+              : "text-alert-important"
           )}
         >
           {isOpen ? (
@@ -91,6 +94,87 @@ export function IssueHeader({
             </span>
           ))}
       </div>
+      {linkedPRs && linkedPRs.length > 0 && (() => {
+        const localPRs = linkedPRs.filter(
+          (pr) => pr.repoOwner === owner && pr.repoName === repo
+        );
+        const upstreamPRs = linkedPRs.filter(
+          (pr) => pr.repoOwner !== owner || pr.repoName !== repo
+        );
+        return (
+          <div className="flex flex-col gap-1.5 mt-2">
+            {localPRs.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {localPRs.map((pr) => (
+                  <Link
+                    key={pr.number}
+                    href={`/${owner}/${repo}/pulls/${pr.number}`}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-mono border rounded-sm transition-colors hover:bg-muted/50",
+                      pr.merged
+                        ? "text-purple-400 border-purple-400/20"
+                        : pr.state === "open"
+                          ? "text-success border-success/20"
+                          : "text-alert-important border-alert-important/20"
+                    )}
+                  >
+                    <GitPullRequest className="w-3 h-3" />
+                    <span>#{pr.number}</span>
+                    <span className="text-muted-foreground/70 max-w-[200px] truncate">{pr.title}</span>
+                    <span
+                      className={cn(
+                        "text-[9px] px-1 py-px rounded-sm",
+                        pr.merged
+                          ? "bg-purple-400/10 text-purple-400"
+                          : pr.state === "open"
+                            ? "bg-success/10 text-success"
+                            : "bg-alert-important/10 text-alert-important"
+                      )}
+                    >
+                      {pr.merged ? "merged" : pr.state}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {upstreamPRs.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {upstreamPRs.map((pr) => (
+                  <Link
+                    key={`${pr.repoOwner}/${pr.repoName}#${pr.number}`}
+                    href={`/${pr.repoOwner}/${pr.repoName}/pulls/${pr.number}`}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-mono border border-dashed rounded-sm transition-colors hover:bg-muted/50",
+                      pr.merged
+                        ? "text-purple-400/70 border-purple-400/15"
+                        : pr.state === "open"
+                          ? "text-success/70 border-success/15"
+                          : "text-alert-important/70 border-alert-important/15"
+                    )}
+                  >
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                    <span className="text-muted-foreground/50">{pr.repoOwner}/{pr.repoName}</span>
+                    <span>#{pr.number}</span>
+                    <span className="text-muted-foreground/50 max-w-[160px] truncate">{pr.title}</span>
+                    <span
+                      className={cn(
+                        "text-[9px] px-1 py-px rounded-sm",
+                        pr.merged
+                          ? "bg-purple-400/10 text-purple-400/70"
+                          : pr.state === "open"
+                            ? "bg-success/10 text-success/70"
+                            : "bg-alert-important/10 text-alert-important/70"
+                      )}
+                    >
+                      {pr.merged ? "merged" : pr.state}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

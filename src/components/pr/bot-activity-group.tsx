@@ -26,13 +26,13 @@ export function BotActivityGroup({
       : `${botNames.length} bots`;
 
   return (
-    <div className="rounded-lg border border-dashed border-zinc-200/50 dark:border-zinc-800/40">
+    <div className="rounded-lg border border-dashed border-border/40">
       <button
         onClick={() => setExpanded((e) => !e)}
         className={cn(
           "w-full flex items-center gap-2 px-3 py-2 text-left transition-colors cursor-pointer",
-          "hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20",
-          expanded && "border-b border-dashed border-zinc-200/50 dark:border-zinc-800/40"
+          "hover:bg-muted/30",
+          expanded && "border-b border-dashed border-border/40"
         )}
       >
         <ChevronRight
@@ -49,7 +49,7 @@ export function BotActivityGroup({
               alt=""
               width={16}
               height={16}
-              className="rounded-full shrink-0 ring-1 ring-white dark:ring-zinc-900"
+              className="rounded-full shrink-0 ring-1 ring-background"
             />
           ))}
         </div>

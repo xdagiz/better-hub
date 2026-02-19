@@ -105,7 +105,7 @@ export function RepoSidebar({
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-[260px] shrink-0 overflow-y-auto pt-0 px-4 pb-4 flex-col gap-5">
-        {/* Avatar + project name */}
+        {/* Avatar + Description + Badges */}
         <div className="flex flex-col gap-2">
           <Image
             src={avatarUrl}
@@ -114,11 +114,6 @@ export function RepoSidebar({
             height={160}
             className="w-32 aspect-square rounded-sm border border-border"
           />
-          <span className="text-sm font-medium text-foreground">{repoName}</span>
-        </div>
-
-        {/* Description + Badges */}
-        <div className="flex flex-col gap-2">
           {description && (
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
               {description}
@@ -139,7 +134,7 @@ export function RepoSidebar({
             <p className="text-[11px] text-muted-foreground/60">
               Forked from{" "}
               <Link
-                href={`/repos/${parent.owner}/${parent.name}`}
+                href={`/${parent.owner}/${parent.name}`}
                 className="text-muted-foreground hover:text-foreground transition-colors font-mono"
               >
                 {parent.fullName}
@@ -156,8 +151,8 @@ export function RepoSidebar({
               Latest commit
             </span>
             <Link
-              href={`/repos/${owner}/${repoName}/commits`}
-              className="group flex items-start gap-2 p-2 -mx-2 rounded-md hover:bg-zinc-100/50 dark:hover:bg-zinc-800/40 transition-colors"
+              href={`/${owner}/${repoName}/commits`}
+              className="group flex items-start gap-2 p-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors"
             >
               {latestCommit.author?.avatarUrl ? (
                 <Image
@@ -168,7 +163,7 @@ export function RepoSidebar({
                   className="rounded-full shrink-0 mt-0.5"
                 />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-700 shrink-0 mt-0.5" />
+                <div className="w-5 h-5 rounded-full bg-muted shrink-0 mt-0.5" />
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-foreground/80 group-hover:text-foreground truncate transition-colors">
@@ -194,7 +189,7 @@ export function RepoSidebar({
               {topics.map((topic) => (
                 <span
                   key={topic}
-                  className="text-[10px] font-mono px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800/80 text-muted-foreground rounded-full shrink-0"
+                  className="text-[10px] font-mono px-2 py-0.5 bg-muted text-muted-foreground rounded-full shrink-0"
                 >
                   {topic}
                 </span>
@@ -247,7 +242,7 @@ export function RepoSidebar({
             href={htmlUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 text-[11px] font-mono py-1.5 border border-border text-muted-foreground hover:text-foreground hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
+            className="flex items-center justify-center gap-1.5 text-[11px] font-mono py-1.5 border border-border text-muted-foreground hover:text-foreground hover:border-border transition-colors"
           >
             <ExternalLink className="w-3 h-3" />
             Open on GitHub
@@ -256,7 +251,7 @@ export function RepoSidebar({
             href={`${htmlUrl}/fork`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 text-[11px] font-mono py-1.5 border border-border text-muted-foreground hover:text-foreground hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
+            className="flex items-center justify-center gap-1.5 text-[11px] font-mono py-1.5 border border-border text-muted-foreground hover:text-foreground hover:border-border transition-colors"
           >
             <GitFork className="w-3 h-3" />
             Fork

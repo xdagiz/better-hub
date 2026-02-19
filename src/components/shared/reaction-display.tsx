@@ -158,7 +158,7 @@ function ReactionsContextMenu({
                         className="rounded-full shrink-0"
                       />
                     ) : (
-                      <div className="w-3.5 h-3.5 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+                      <div className="w-3.5 h-3.5 rounded-full bg-muted-foreground shrink-0" />
                     )}
                     <span className="text-[11px] font-mono text-foreground/80 truncate">
                       {u.login}
@@ -277,7 +277,7 @@ export function ReactionDisplay({
                     ) : (
                       <span
                         key={u.login}
-                        className="w-3 h-3 rounded-full bg-zinc-300 dark:bg-zinc-700 ring-1 ring-background shrink-0"
+                        className="w-3 h-3 rounded-full bg-muted-foreground ring-1 ring-background shrink-0"
                       />
                     )
                   ))}
@@ -291,7 +291,7 @@ export function ReactionDisplay({
               {/* Portal tooltip */}
               {isHovered && (
                 <Tooltip anchorRef={hoveredRef}>
-                  <div className="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 dark:text-zinc-200 text-[10px] font-mono px-2 py-1 rounded shadow-lg whitespace-nowrap max-w-[220px]">
+                  <div className="bg-popover text-popover-foreground text-[10px] font-mono px-2 py-1 rounded shadow-lg whitespace-nowrap max-w-[220px]">
                     {users.length > 0 ? (
                       <span className="truncate block">
                         {users.slice(0, 10).map((u) => u.login).join(", ")}

@@ -6,6 +6,7 @@ import { RepoNav } from "@/components/repo/repo-nav";
 import { CodeContentWrapper } from "@/components/repo/code-content-wrapper";
 import { RepoLayoutWrapper } from "@/components/repo/repo-layout-wrapper";
 import { ChatPageActivator } from "@/components/shared/chat-page-activator";
+import { countPromptRequests } from "@/lib/prompt-request-store";
 
 export default async function RepoLayout({
   children,
@@ -38,6 +39,8 @@ export default async function RepoLayout({
   const showPeopleTab = isOrgRepo && (userOrgs as any[]).some(
     (org: any) => org.login?.toLowerCase() === owner.toLowerCase()
   );
+
+  const promptRequestsCount = countPromptRequests(owner, repoName, "open");
 
   if (!repoData) {
     return (
@@ -104,6 +107,7 @@ export default async function RepoLayout({
             openIssuesCount={navCounts.openIssues}
             openPrsCount={navCounts.openPrs}
             activeRunsCount={navCounts.activeRuns}
+            promptRequestsCount={promptRequestsCount}
             showPeopleTab={showPeopleTab}
           />
         </div>

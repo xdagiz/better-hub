@@ -44,22 +44,22 @@ const stateConfig: Record<string, { icon: typeof Check; label: string; className
   APPROVED: {
     icon: Check,
     label: "Approved",
-    className: "text-emerald-600 dark:text-emerald-400",
+    className: "text-success",
   },
   CHANGES_REQUESTED: {
     icon: AlertTriangle,
     label: "Changes requested",
-    className: "text-amber-600 dark:text-amber-400",
+    className: "text-warning",
   },
   COMMENTED: {
     icon: MessageSquare,
     label: "Commented",
-    className: "text-blue-600 dark:text-blue-400",
+    className: "text-info",
   },
   DISMISSED: {
     icon: XIcon,
     label: "Dismissed",
-    className: "text-zinc-500",
+    className: "text-muted-foreground",
   },
 };
 
@@ -135,7 +135,7 @@ export function PRReviewsPanel({
     <div className="flex flex-col h-full">
       {/* Review summary */}
       {reviewSummaries.length > 0 && (
-        <div className="shrink-0 px-4 py-3 border-b border-zinc-200/60 dark:border-zinc-800/40">
+        <div className="shrink-0 px-4 py-3 border-b border-border/60">
           <div className="flex flex-wrap items-center gap-3">
             {reviewSummaries.map((r) => {
               const config = stateConfig[r.state] || stateConfig.COMMENTED;
@@ -165,7 +165,7 @@ export function PRReviewsPanel({
       )}
 
       {/* Filter bar */}
-      <div className="shrink-0 px-4 py-2 border-b border-zinc-200/60 dark:border-zinc-800/40 bg-zinc-50/30 dark:bg-zinc-900/20">
+      <div className="shrink-0 px-4 py-2 border-b border-border/60 bg-card/30">
         <div className="flex items-center gap-1">
           {(
             [
@@ -180,8 +180,8 @@ export function PRReviewsPanel({
               className={cn(
                 "px-2.5 py-1 text-xs rounded-md transition-colors cursor-pointer",
                 filter === key
-                  ? "bg-zinc-200/80 dark:bg-zinc-800/80 text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/40"
+                  ? "bg-accent text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
               )}
             >
               {label}
@@ -217,12 +217,12 @@ export function PRReviewsPanel({
           return (
             <div
               key={filePath}
-              className="border-b border-zinc-200/40 dark:border-zinc-800/30"
+              className="border-b border-border/40"
             >
               {/* File header */}
               <button
                 onClick={() => toggleFile(filePath)}
-                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-zinc-50/80 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-muted/50 transition-colors cursor-pointer"
               >
                 <ChevronDown
                   className={cn(
@@ -244,7 +244,7 @@ export function PRReviewsPanel({
                   {fileThreads.length !== 1 ? "s" : ""}
                 </span>
                 {fileUnresolved > 0 && (
-                  <span className="text-[10px] text-amber-500/70 shrink-0">
+                  <span className="text-[10px] text-warning/70 shrink-0">
                     {fileUnresolved} open
                   </span>
                 )}
@@ -305,8 +305,8 @@ function ThreadCard({
       className={cn(
         "rounded-lg border transition-colors",
         thread.isResolved
-          ? "border-zinc-200/40 dark:border-zinc-800/30 bg-zinc-50/30 dark:bg-zinc-900/10"
-          : "border-zinc-200/60 dark:border-zinc-800/50"
+          ? "border-border/40 bg-card/30"
+          : "border-border/60"
       )}
     >
       {/* Collapsed preview — always visible */}
@@ -362,8 +362,8 @@ function ThreadCard({
                 "inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-md transition-colors cursor-pointer",
                 isPending && "opacity-40 pointer-events-none",
                 thread.isResolved
-                  ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-                  : "text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/40"
+                  ? "text-success hover:bg-success/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
               )}
             >
               {isPending ? (
@@ -392,20 +392,20 @@ function ThreadCard({
               </div>
             </div>
             {/* Fade overlay */}
-            <div className="absolute bottom-2 left-[2.25rem] right-3 h-6 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
+            <div className="absolute bottom-2 left-[2.25rem] right-3 h-6 bg-gradient-to-t from-background to-transparent pointer-events-none" />
           </div>
         )}
       </button>
 
       {/* Expanded — full thread */}
       {expanded && (
-        <div className="border-t border-zinc-200/40 dark:border-zinc-800/30">
+        <div className="border-t border-border/40">
           {thread.comments.map((comment, i) => (
             <div
               key={comment.id}
               className={cn(
                 i > 0 &&
-                  "border-t border-zinc-200/30 dark:border-zinc-800/20"
+                  "border-t border-border/30"
               )}
             >
               <div className="flex items-center gap-1.5 px-3 py-1.5">

@@ -64,7 +64,7 @@ export function RunDetail({
     <div>
       {/* Back link */}
       <Link
-        href={`/repos/${owner}/${repo}/actions`}
+        href={`/${owner}/${repo}/actions`}
         className="inline-flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors mb-4"
       >
         <ArrowLeft className="w-3 h-3" />
@@ -91,10 +91,10 @@ export function RunDetail({
                 className={cn(
                   "text-[10px] font-mono uppercase px-2 py-0.5 border",
                   run.conclusion === "success"
-                    ? "border-emerald-500/30 text-emerald-500"
+                    ? "border-success/30 text-success"
                     : run.conclusion === "failure"
-                      ? "border-red-500/30 text-red-500"
-                      : "border-zinc-300 dark:border-zinc-700 text-muted-foreground"
+                      ? "border-destructive/30 text-destructive"
+                      : "border-border text-muted-foreground"
                 )}
               >
                 {conclusionLabel(run.conclusion, run.status ?? "")}
@@ -175,7 +175,7 @@ export function RunDetail({
 
             {/* Steps */}
             {job.steps && job.steps.length > 0 && (
-              <div className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+              <div className="divide-y divide-border/50">
                 {job.steps.map((step) => (
                   <div
                     key={step.number}

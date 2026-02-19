@@ -129,9 +129,9 @@ export function IssueCommentForm({ owner, repo, issueNumber, issueState, userAva
       {optimisticComments.map((c) => (
         <div
           key={c.id}
-          className="border border-zinc-200/60 dark:border-zinc-800/50 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className="border border-border/60 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
         >
-          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/40 bg-zinc-50/50 dark:bg-zinc-800/20">
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-muted/40">
             {userAvatarUrl ? (
               <Image
                 src={userAvatarUrl}
@@ -141,7 +141,7 @@ export function IssueCommentForm({ owner, repo, issueNumber, issueState, userAva
                 className="rounded-full shrink-0"
               />
             ) : (
-              <div className="w-4 h-4 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+              <div className="w-4 h-4 rounded-full bg-muted-foreground shrink-0" />
             )}
             <span className="text-xs font-medium text-foreground/80">
               {userName || "You"}
@@ -160,8 +160,8 @@ export function IssueCommentForm({ owner, repo, issueNumber, issueState, userAva
       ))}
 
       {/* Comment form */}
-      <div className="border border-zinc-200/60 dark:border-zinc-800/50 rounded-md overflow-hidden">
-        <div className="px-3.5 py-2 border-b border-zinc-200/60 dark:border-zinc-800/40 bg-zinc-50/50 dark:bg-zinc-800/20">
+      <div className="border border-border/60 rounded-md overflow-hidden">
+        <div className="px-3.5 py-2 border-b border-border/60 bg-muted/40">
           <div className="flex items-center gap-2">
             {userAvatarUrl && (
               <Image
@@ -195,7 +195,7 @@ export function IssueCommentForm({ owner, repo, issueNumber, issueState, userAva
           <div className="flex items-center justify-between mt-2">
             <div>
               {error && (
-                <span className="text-xs text-red-500">{error}</span>
+                <span className="text-xs text-destructive">{error}</span>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -208,7 +208,7 @@ export function IssueCommentForm({ owner, repo, issueNumber, issueState, userAva
                       disabled={isPending}
                       className={cn(
                         "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium",
-                        "text-foreground/80 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+                        "text-foreground/80 hover:text-foreground hover:bg-muted/50",
                         "transition-colors cursor-pointer",
                         "disabled:opacity-40 disabled:cursor-not-allowed"
                       )}
@@ -233,7 +233,7 @@ export function IssueCommentForm({ owner, repo, issueNumber, issueState, userAva
                       disabled={isPending}
                       className={cn(
                         "inline-flex items-center justify-center w-7 border-l border-border",
-                        "text-foreground/80 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+                        "text-foreground/80 hover:text-foreground hover:bg-muted/50",
                         "transition-colors cursor-pointer",
                         "disabled:opacity-40 disabled:cursor-not-allowed"
                       )}
@@ -295,7 +295,7 @@ export function IssueCommentForm({ owner, repo, issueNumber, issueState, userAva
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md",
                     "border border-border",
-                    "text-foreground/80 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+                    "text-foreground/80 hover:text-foreground hover:bg-muted/50",
                     "transition-colors cursor-pointer",
                     "disabled:opacity-40 disabled:cursor-not-allowed"
                   )}
@@ -316,7 +316,7 @@ export function IssueCommentForm({ owner, repo, issueNumber, issueState, userAva
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md",
                   "border border-border",
-                  "text-foreground/80 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+                  "text-foreground/80 hover:text-foreground hover:bg-muted/50",
                   "transition-colors cursor-pointer",
                   "disabled:opacity-40 disabled:cursor-not-allowed"
                 )}

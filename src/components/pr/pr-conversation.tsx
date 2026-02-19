@@ -221,16 +221,16 @@ async function ChatMessage({
     <div className="group">
       <div
         className={cn(
-          "border border-zinc-200/60 dark:border-zinc-800/50 rounded-lg overflow-hidden",
-          isFirst && "border-zinc-200/80 dark:border-zinc-700/50"
+          "border border-border/60 rounded-lg overflow-hidden",
+          isFirst && "border-border"
         )}
       >
         <div
           className={cn(
-            "flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/40",
+            "flex items-center gap-2 px-3 py-1.5 border-b border-border/60",
             isFirst
-              ? "bg-zinc-50/80 dark:bg-zinc-800/30"
-              : "bg-zinc-50/50 dark:bg-zinc-800/20"
+              ? "bg-card/80"
+              : "bg-card/50"
           )}
         >
           {entry.user ? (
@@ -248,7 +248,7 @@ async function ChatMessage({
             </Link>
           ) : (
             <>
-              <div className="w-4 h-4 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+              <div className="w-4 h-4 rounded-full bg-muted-foreground shrink-0" />
               <span className="text-xs font-medium text-foreground/80">ghost</span>
             </>
           )}
@@ -260,7 +260,7 @@ async function ChatMessage({
           {entry.type === "comment" &&
             entry.author_association &&
             entry.author_association !== "NONE" && (
-              <span className="text-[9px] px-1 py-px border border-zinc-200/80 dark:border-zinc-800/60 text-muted-foreground/50 rounded">
+              <span className="text-[9px] px-1 py-px border border-border text-muted-foreground/50 rounded">
                 {entry.author_association.toLowerCase()}
               </span>
             )}
@@ -333,7 +333,7 @@ function CommitGroup({ commits }: { commits: CommitEntry[] }) {
   )];
 
   const list = (
-    <div className="rounded-lg border border-zinc-200/60 dark:border-zinc-800/50 overflow-hidden">
+    <div className="rounded-lg border border-border/60 overflow-hidden">
       {commits.map((commit, i) => {
         const firstLine = commit.message.split("\n")[0];
         return (
@@ -341,7 +341,7 @@ function CommitGroup({ commits }: { commits: CommitEntry[] }) {
             key={commit.sha}
             className={cn(
               "flex items-center gap-2.5 px-3 py-1.5",
-              i > 0 && "border-t border-zinc-200/40 dark:border-zinc-800/30"
+              i > 0 && "border-t border-border/40"
             )}
           >
             <GitCommitHorizontal className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
@@ -356,7 +356,7 @@ function CommitGroup({ commits }: { commits: CommitEntry[] }) {
                 />
               </Link>
             ) : (
-              <div className="w-4 h-4 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+              <div className="w-4 h-4 rounded-full bg-muted-foreground shrink-0" />
             )}
             <span className="text-xs text-foreground/80 truncate flex-1 min-w-0">
               {firstLine}

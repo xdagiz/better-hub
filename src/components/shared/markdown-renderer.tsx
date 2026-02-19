@@ -5,6 +5,7 @@ import remarkRehype from "remark-rehype";
 import rehypeRaw from "rehype-raw";
 import rehypeStringify from "rehype-stringify";
 import { highlightCode } from "@/lib/shiki";
+import { toInternalUrl } from "@/lib/github-utils";
 
 interface RepoContext {
   owner: string;
@@ -24,7 +25,7 @@ function isAbsoluteUrl(url: string): boolean {
  */
 function resolveUrls(html: string, ctx: RepoContext): string {
   const rawBase = `https://raw.githubusercontent.com/${ctx.owner}/${ctx.repo}/${ctx.branch}`;
-  const repoBase = `/repos/${ctx.owner}/${ctx.repo}`;
+  const repoBase = `/${ctx.owner}/${ctx.repo}`;
   const dir = ctx.dir || "";
 
   // Resolve image src attributes
@@ -220,6 +221,17 @@ export async function renderMarkdownToHtml(
     html = resolveUrls(html, repoContext);
   }
 
+  // Convert github.com links to internal app paths
+  html = html.replace(
+    /<a\s+href="(https:\/\/github\.com\/[^"]+)"/gi,
+    (_match, href) => {
+      const internal = toInternalUrl(href);
+      if (internal !== href) return `<a href="${internal}"`;
+      return _match;
+    }
+  );
+
+  // Add target="_blank" only to external (absolute http) links
   html = html.replace(
     /<a\s+href="(https?:\/\/[^"]+)"/gi,
     '<a href="$1" target="_blank" rel="noopener noreferrer"'

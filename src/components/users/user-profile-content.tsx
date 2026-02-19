@@ -374,7 +374,7 @@ export function UserProfileContent({
         {filtered.map((repo) => (
           <Link
             key={repo.id}
-            href={`/repos/${repo.full_name}`}
+            href={`/${repo.full_name}`}
             className="group flex items-center gap-4 px-4 py-3 hover:bg-muted/60 dark:hover:bg-white/3 transition-colors"
           >
             <FolderGit2 className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
@@ -449,7 +449,7 @@ export function UserProfileContent({
 
         {filtered.length === 0 && (
           <div className="py-16 text-center">
-            <FolderGit2 className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+            <FolderGit2 className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-xs text-muted-foreground font-mono">
               No repositories found
             </p>

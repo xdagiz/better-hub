@@ -201,7 +201,7 @@ export function DashboardContent({
                   callbackURL: "/dashboard",
                 })
               }
-              className="shrink-0 flex items-center gap-3 px-4 py-3 border border-dashed border-zinc-300/70 dark:border-zinc-700/50 hover:border-foreground/20 dark:hover:border-foreground/10 transition-colors group cursor-pointer text-left"
+              className="shrink-0 flex items-center gap-3 px-4 py-3 border border-dashed border-border/70 hover:border-foreground/20 dark:hover:border-foreground/10 transition-colors group cursor-pointer text-left"
             >
               <svg className="w-4 h-4 shrink-0 text-muted-foreground/60 group-hover:text-foreground/60 transition-colors" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.27 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.163 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.163 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.163 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.27a2.527 2.527 0 0 1-2.52-2.523 2.527 2.527 0 0 1 2.52-2.52h6.315A2.528 2.528 0 0 1 24 15.163a2.528 2.528 0 0 1-2.522 2.523h-6.315z"/>
@@ -267,7 +267,7 @@ function WorkTabs({
 
   if (!hasWork) {
     return (
-      <div className="flex-1 min-h-0 border border-border py-12 text-center bg-card">
+      <div className="flex-1 min-h-0 border border-border py-12 text-center">
         <CheckCircle2 className="w-5 h-5 text-muted-foreground/40 mx-auto mb-2" />
         <p className="text-xs text-muted-foreground font-mono">
           Nothing needs your attention
@@ -277,7 +277,7 @@ function WorkTabs({
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col border border-border bg-card">
+    <div className="flex-1 min-h-0 flex flex-col border border-border">
       {/* Tab header */}
       <div className="shrink-0 flex items-center border-b border-border">
         {tabs.map((tab) => (
@@ -356,7 +356,7 @@ function ReposTabs({
   const [tab, setTab] = useState<"repos" | "trending">("repos");
 
   return (
-    <section className="flex-1 border border-border bg-card flex flex-col min-h-0">
+    <section className="flex-1 border border-border flex flex-col min-h-0">
       <div className="shrink-0 flex items-center border-b border-border">
         <button
           onClick={() => setTab("repos")}
@@ -430,7 +430,7 @@ function Stat({
         "relative flex flex-col gap-1.5 px-3 py-3 border border-dashed transition-colors",
         accent
           ? "border-foreground/20 dark:border-foreground/10"
-          : "border-zinc-300/70 dark:border-zinc-700/50"
+          : "border-border/70"
       )}
     >
       <div className="flex items-center gap-1.5">
@@ -455,7 +455,7 @@ function Stat({
           {value}
         </span>
         {accent && value > 0 && (
-          <span className="w-1 h-1 rounded-full bg-emerald-500/80 animate-pulse" />
+          <span className="w-1 h-1 rounded-full bg-success/80 animate-pulse" />
         )}
       </div>
     </div>
@@ -466,7 +466,7 @@ function Stat({
 
 function Panel({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
-    <section className="border border-border bg-card">
+    <section className="border border-border">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
         <h2 className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
           {title}
@@ -492,17 +492,17 @@ function ItemRow({ item, type }: { item: IssueItem; type: "pr" | "issue" }) {
   return (
     <Link
       href={toInternalUrl(item.html_url)}
-      className="group flex items-center gap-3 px-4 py-2 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-zinc-100 dark:border-zinc-800/40 last:border-b-0"
+      className="group flex items-center gap-3 px-4 py-2 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-border/60 last:border-b-0"
     >
       {type === "pr" ? (
         <GitPullRequest
           className={cn(
             "w-3.5 h-3.5 shrink-0",
-            isMerged ? "text-purple-500" : isDraft ? "text-muted-foreground" : "text-emerald-500"
+            isMerged ? "text-alert-important" : isDraft ? "text-muted-foreground" : "text-success"
           )}
         />
       ) : (
-        <CircleDot className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+        <CircleDot className="w-3.5 h-3.5 text-success shrink-0" />
       )}
       <div className="flex-1 min-w-0">
         <span className="text-sm truncate block group-hover:text-foreground transition-colors">
@@ -548,8 +548,8 @@ function ItemRow({ item, type }: { item: IssueItem; type: "pr" | "issue" }) {
 function RepoRow({ repo }: { repo: RepoItem }) {
   return (
     <Link
-      href={`/repos/${repo.full_name}`}
-      className="group flex gap-3 px-4 py-2.5 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-zinc-100 dark:border-zinc-800/40 last:border-b-0"
+      href={`/${repo.full_name}`}
+      className="group flex gap-3 px-4 py-2.5 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-border/60 last:border-b-0"
     >
       <Image
         src={repo.owner.avatar_url}
@@ -601,8 +601,8 @@ function RepoRow({ repo }: { repo: RepoItem }) {
 function TrendingRow({ repo }: { repo: TrendingRepoItem }) {
   return (
     <Link
-      href={`/repos/${repo.full_name}`}
-      className="group flex gap-3 px-4 py-2.5 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-zinc-100 dark:border-zinc-800/40 last:border-b-0"
+      href={`/${repo.full_name}`}
+      className="group flex gap-3 px-4 py-2.5 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-border/60 last:border-b-0"
     >
       <Image
         src={repo.owner.avatar_url}
@@ -655,7 +655,7 @@ function TrendingRow({ repo }: { repo: TrendingRepoItem }) {
 function getMarqueeItem(event: ActivityEvent): { icon: React.ReactNode; text: string; href: string; time: string } | null {
   const repoFullName = event.repo?.name;
   if (!repoFullName) return null;
-  const repoBase = `/repos/${repoFullName}`;
+  const repoBase = `/${repoFullName}`;
   const time = event.created_at
     ? new Date(event.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: false })
     : "";
@@ -677,7 +677,7 @@ function getMarqueeItem(event: ActivityEvent): { icon: React.ReactNode; text: st
       if (!pr?.number) return { icon: <GitPullRequest className="w-3 h-3" />, text: `PR activity in ${repoFullName}`, href: repoBase, time };
       const action = p.action === "closed" && pr.merged ? "merged" : (p.action || "updated");
       return {
-        icon: <GitPullRequest className={cn("w-3 h-3", action === "merged" ? "text-purple-400" : action === "opened" ? "text-emerald-400" : "")} />,
+        icon: <GitPullRequest className={cn("w-3 h-3", action === "merged" ? "text-alert-important" : action === "opened" ? "text-success" : "")} />,
         text: `${action} #${pr.number}${pr.title ? `: ${pr.title}` : ""}`,
         href: `${repoBase}/pulls/${pr.number}`,
         time,
@@ -708,7 +708,7 @@ function getMarqueeItem(event: ActivityEvent): { icon: React.ReactNode; text: st
       if (!issue?.number) return { icon: <CircleDot className="w-3 h-3" />, text: `Issue activity in ${repoFullName}`, href: repoBase, time };
       const action = p.action || "updated";
       return {
-        icon: <CircleDot className={cn("w-3 h-3", action === "opened" ? "text-emerald-400" : "")} />,
+        icon: <CircleDot className={cn("w-3 h-3", action === "opened" ? "text-success" : "")} />,
         text: `${action} #${issue.number}${issue.title ? `: ${issue.title}` : ""}`,
         href: `${repoBase}/issues/${issue.number}`,
         time,
@@ -742,7 +742,7 @@ function getMarqueeItem(event: ActivityEvent): { icon: React.ReactNode; text: st
       };
     case "WatchEvent":
       return {
-        icon: <Star className="w-3 h-3 text-amber-400" />,
+        icon: <Star className="w-3 h-3 text-warning" />,
         text: `starred ${repoFullName}`,
         href: repoBase,
         time,
@@ -815,7 +815,7 @@ function ActivityMarquee({ activity }: { activity: Array<ActivityEvent> }) {
   ));
 
   return (
-    <div className="shrink-0 overflow-hidden border border-border bg-card">
+    <div className="shrink-0 overflow-hidden border border-border">
       <div className="flex whitespace-nowrap marquee-track text-[11px] font-mono text-muted-foreground py-2 px-3">
         {content}
         {content}

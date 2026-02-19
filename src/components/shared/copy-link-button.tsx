@@ -31,7 +31,7 @@ export function CopyLinkButton({ owner, repo, number, type, iconOnly }: CopyLink
         title="Copy GitHub link"
       >
         {copied ? (
-          <Check className="w-3.5 h-3.5 text-emerald-500" />
+          <Check className="w-3.5 h-3.5 text-success" />
         ) : (
           <Copy className="w-3.5 h-3.5" />
         )}
@@ -46,7 +46,7 @@ export function CopyLinkButton({ owner, repo, number, type, iconOnly }: CopyLink
     >
       {copied ? (
         <>
-          <Check className="w-3 h-3 text-emerald-500" />
+          <Check className="w-3 h-3 text-success" />
           Copied
         </>
       ) : (

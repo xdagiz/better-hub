@@ -165,7 +165,7 @@ export function PRMergePanel({
         {result && (
           <span className={cn(
             "text-[10px] font-mono",
-            result.type === "error" ? "text-red-500" : "text-emerald-500"
+            result.type === "error" ? "text-destructive" : "text-success"
           )}>
             {result.message}
           </span>
@@ -194,7 +194,7 @@ export function PRMergePanel({
         {result && (
           <span className={cn(
             "text-[10px] font-mono",
-            result.type === "error" ? "text-red-500" : "text-emerald-500"
+            result.type === "error" ? "text-destructive" : "text-success"
           )}>
             {result.message}
           </span>

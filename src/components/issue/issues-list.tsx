@@ -16,6 +16,10 @@ import {
   Clock,
   X,
   ThumbsUp,
+  ArrowUpDown,
+  SlidersHorizontal,
+  Search,
+  CircleSlash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
@@ -23,11 +27,6 @@ import { CreateIssueDialog } from "./create-issue-dialog";
 import { useClickOutside } from "@/hooks/use-click-outside";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import {
-  ListSearchInput,
-  OpenClosedToggle,
-  SortCycleButton,
-  FiltersButton,
-  ClearFiltersButton,
   InfiniteScrollSentinel,
   LoadingOverlay,
 } from "@/components/shared/list-controls";
@@ -43,6 +42,7 @@ interface Issue {
   number: number;
   title: string;
   state: string;
+  state_reason?: string | null;
   updated_at: string;
   created_at: string;
   closed_at: string | null;
@@ -53,6 +53,8 @@ interface Issue {
   milestone: { title: string } | null;
   reactions: { total_count: number; "+1": number };
 }
+
+type TabState = "open" | "closed" | "not_planned";
 
 type SortType = "updated" | "newest" | "oldest" | "comments" | "reactions";
 type AssigneeFilter = "all" | "assigned" | "unassigned";
@@ -95,7 +97,7 @@ export function IssuesList({
     author: string
   ) => Promise<{ open: Issue[]; closed: Issue[] }>;
 }) {
-  const [state, setState] = useState<"open" | "closed">("open");
+  const [state, setState] = useState<TabState>("open");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortType>("updated");
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
@@ -192,8 +194,22 @@ export function IssuesList({
   const currentClosedIssues = authorIssues
     ? authorIssues.closed
     : closedIssues;
+
+  const closedCompleted = useMemo(
+    () => currentClosedIssues.filter((i) => i.state_reason !== "not_planned"),
+    [currentClosedIssues]
+  );
+  const closedNotPlanned = useMemo(
+    () => currentClosedIssues.filter((i) => i.state_reason === "not_planned"),
+    [currentClosedIssues]
+  );
+
   const baseIssues =
-    state === "open" ? currentOpenIssues : currentClosedIssues;
+    state === "open"
+      ? currentOpenIssues
+      : state === "closed"
+        ? closedCompleted
+        : closedNotPlanned;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -291,54 +307,64 @@ export function IssuesList({
   return (
     <div>
       {/* Toolbar */}
-      <div className="sticky top-0 z-10 bg-background pb-4 pt-4 before:content-[''] before:absolute before:left-0 before:right-0 before:bottom-full before:h-8 before:bg-background">
-        {/* Row 1: Search + Open/Closed + Sort + Filters + Clear */}
+      <div className="sticky top-0 z-10 bg-background pb-3 pt-4 before:content-[''] before:absolute before:left-0 before:right-0 before:bottom-full before:h-8 before:bg-background">
+        {/* Row 1: Search + Sort + Filter + New Issue */}
         <div className="flex items-center gap-2 mb-3">
-          <ListSearchInput
-            placeholder="Search issues..."
-            value={search}
-            onChange={setSearch}
-          />
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40" />
+            <input
+              type="text"
+              placeholder="Search issues..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-8 bg-transparent border border-border rounded-lg pl-9 pr-4 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-foreground/20 transition-colors"
+            />
+          </div>
 
-          <OpenClosedToggle
-            state={state}
-            counts={{
-              open: authorIssues ? currentOpenIssues.length : openCount,
-              closed: authorIssues ? currentClosedIssues.length : closedCount,
-            }}
-            icons={{
-              open: <CircleDot className="w-3 h-3" />,
-              closed: <CheckCircle2 className="w-3 h-3" />,
-            }}
-            onStateChange={setState}
-          />
-
-          <SortCycleButton
-            sort={sort}
-            cycle={sortCycle}
-            labels={sortLabels}
-            onSort={setSort}
-          />
+          <button
+            onClick={() => setSort(sortCycle[(sortCycle.indexOf(sort) + 1) % sortCycle.length])}
+            className={cn(
+              "flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[11px] font-mono uppercase tracking-wider transition-colors cursor-pointer",
+              sort !== "updated"
+                ? "border-foreground/20 bg-muted/50 dark:bg-white/4 text-foreground"
+                : "border-border text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 dark:hover:bg-white/3"
+            )}
+          >
+            <ArrowUpDown className="w-3 h-3" />
+            {sortLabels[sort]}
+          </button>
 
           <div ref={filtersRef} className="relative">
-            <FiltersButton
-              open={filtersOpen}
-              activeCount={activeFilterCount}
-              onToggle={() => setFiltersOpen((v) => !v)}
-            />
+            <button
+              onClick={() => setFiltersOpen((v) => !v)}
+              className={cn(
+                "flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[11px] font-mono uppercase tracking-wider transition-colors cursor-pointer",
+                filtersOpen || activeFilterCount > 0
+                  ? "border-foreground/20 bg-muted/50 dark:bg-white/4 text-foreground"
+                  : "border-border text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 dark:hover:bg-white/3"
+              )}
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="flex items-center justify-center w-4 h-4 rounded-full bg-foreground/10 text-[9px] font-mono text-foreground">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
 
             {filtersOpen && (
-              <div className="absolute z-30 top-full right-0 mt-1.5 w-72 border border-border bg-background shadow-xl rounded-lg overflow-hidden">
+              <div className="absolute z-30 top-full right-0 mt-2 w-72 border border-border/60 bg-background shadow-xl rounded-xl overflow-hidden">
                 {/* Activity */}
-                <div className="px-3 pt-3 pb-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/50">
+                <div className="px-3.5 pt-3 pb-2.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/40">
                     Activity
                   </span>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
+                  <div className="flex flex-wrap gap-1 mt-2">
                     {(
                       [
                         ["all", "All"],
-                        ["most-active", "Most Active"],
+                        ["most-active", "Active"],
                         ["no-response", "No Response"],
                         ["quiet", "Quiet"],
                       ] as [ActivityFilter, string][]
@@ -347,10 +373,10 @@ export function IssuesList({
                         key={value}
                         onClick={() => setActivityFilter(value)}
                         className={cn(
-                          "px-2 py-1 text-[10px] font-mono rounded transition-colors cursor-pointer",
+                          "px-2.5 py-1 text-[10px] font-mono rounded-md transition-colors cursor-pointer",
                           activityFilter === value
-                            ? "bg-foreground/10 text-foreground"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/5"
+                            ? "bg-foreground/8 text-foreground"
+                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/4"
                         )}
                       >
                         {label}
@@ -359,14 +385,14 @@ export function IssuesList({
                   </div>
                 </div>
 
-                <div className="border-t border-zinc-200/60 dark:border-zinc-800/60" />
+                <div className="border-t border-border/30 mx-3" />
 
                 {/* Assignee */}
-                <div className="px-3 pt-2 pb-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/50">
+                <div className="px-3.5 pt-2.5 pb-2.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/40">
                     Assignee
                   </span>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
+                  <div className="flex flex-wrap gap-1 mt-2">
                     {(
                       [
                         ["all", "All"],
@@ -378,10 +404,10 @@ export function IssuesList({
                         key={value}
                         onClick={() => setAssigneeFilter(value)}
                         className={cn(
-                          "px-2 py-1 text-[10px] font-mono rounded transition-colors cursor-pointer",
+                          "px-2.5 py-1 text-[10px] font-mono rounded-md transition-colors cursor-pointer",
                           assigneeFilter === value
-                            ? "bg-foreground/10 text-foreground"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/5"
+                            ? "bg-foreground/8 text-foreground"
+                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/4"
                         )}
                       >
                         {label}
@@ -390,14 +416,14 @@ export function IssuesList({
                   </div>
                 </div>
 
-                <div className="border-t border-zinc-200/60 dark:border-zinc-800/60" />
+                <div className="border-t border-border/30 mx-3" />
 
                 {/* Author */}
-                <div className="px-3 pt-2 pb-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/50">
+                <div className="px-3.5 pt-2.5 pb-2.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/40">
                     Author
                   </span>
-                  <div className="mt-1.5" ref={authorRef}>
+                  <div className="mt-2" ref={authorRef}>
                     {selectedAuthor && selectedAuthorData ? (
                       <button
                         onClick={() => {
@@ -405,7 +431,7 @@ export function IssuesList({
                           setAuthorSearch("");
                           setAuthorIssues(null);
                         }}
-                        className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono rounded bg-foreground/10 text-foreground transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono rounded-md bg-foreground/8 text-foreground transition-colors cursor-pointer"
                       >
                         <Image
                           src={selectedAuthorData.avatar_url}
@@ -415,7 +441,7 @@ export function IssuesList({
                           className="rounded-full"
                         />
                         {selectedAuthorData.login}
-                        <X className="w-2.5 h-2.5 text-muted-foreground" />
+                        <X className="w-2.5 h-2.5 text-muted-foreground/50" />
                       </button>
                     ) : (
                       <div className="relative">
@@ -428,10 +454,10 @@ export function IssuesList({
                             setAuthorDropdownOpen(true);
                           }}
                           onFocus={() => setAuthorDropdownOpen(true)}
-                          className="w-full bg-transparent border border-border px-2 py-1 text-[10px] font-mono rounded placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/20 transition-colors"
+                          className="w-full bg-transparent border-b border-border/40 px-1 py-1 text-[10px] font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:border-foreground/20 transition-colors"
                         />
                         {authorDropdownOpen && filteredAuthors.length > 0 && (
-                          <div className="absolute z-40 top-full left-0 mt-1 w-full border border-border bg-background shadow-lg max-h-36 overflow-y-auto rounded">
+                          <div className="absolute z-40 top-full left-0 mt-1 w-full border border-border/60 bg-background shadow-lg max-h-36 overflow-y-auto rounded-lg">
                             {filteredAuthors.map((author) => (
                               <button
                                 key={author.login}
@@ -455,7 +481,7 @@ export function IssuesList({
                                     });
                                   }
                                 }}
-                                className="flex items-center gap-2 w-full px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/3 hover:text-foreground transition-colors cursor-pointer"
+                                className="flex items-center gap-2 w-full px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground hover:bg-muted/50 dark:hover:bg-white/3 hover:text-foreground transition-colors cursor-pointer"
                               >
                                 <Image
                                   src={author.avatar_url}
@@ -477,12 +503,12 @@ export function IssuesList({
                 {/* Labels */}
                 {labels.length > 0 && (
                   <>
-                    <div className="border-t border-zinc-200/60 dark:border-zinc-800/60" />
-                    <div className="px-3 pt-2 pb-2">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/50">
+                    <div className="border-t border-border/30 mx-3" />
+                    <div className="px-3.5 pt-2.5 pb-2.5">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/40">
                         Label
                       </span>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
+                      <div className="flex flex-wrap gap-1 mt-2">
                         {labels.map((label) => (
                           <button
                             key={label.name}
@@ -492,10 +518,10 @@ export function IssuesList({
                               )
                             }
                             className={cn(
-                              "flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono rounded transition-colors cursor-pointer",
+                              "flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono rounded-md transition-colors cursor-pointer",
                               selectedLabel === label.name
-                                ? "bg-foreground/10 text-foreground"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/5"
+                                ? "bg-foreground/8 text-foreground"
+                                : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/4"
                             )}
                           >
                             <span
@@ -513,12 +539,12 @@ export function IssuesList({
                 {/* Milestone */}
                 {milestones.length > 0 && (
                   <>
-                    <div className="border-t border-zinc-200/60 dark:border-zinc-800/60" />
-                    <div className="px-3 pt-2 pb-2">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/50">
+                    <div className="border-t border-border/30 mx-3" />
+                    <div className="px-3.5 pt-2.5 pb-2.5">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/40">
                         Milestone
                       </span>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
+                      <div className="flex flex-wrap gap-1 mt-2">
                         {milestones.map((ms) => (
                           <button
                             key={ms}
@@ -528,10 +554,10 @@ export function IssuesList({
                               )
                             }
                             className={cn(
-                              "px-2 py-1 text-[10px] font-mono rounded transition-colors cursor-pointer",
+                              "px-2.5 py-1 text-[10px] font-mono rounded-md transition-colors cursor-pointer",
                               selectedMilestone === ms
-                                ? "bg-foreground/10 text-foreground"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/5"
+                                ? "bg-foreground/8 text-foreground"
+                                : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/4"
                             )}
                           >
                             {ms}
@@ -545,10 +571,10 @@ export function IssuesList({
                 {/* Clear all */}
                 {activeFilterCount > 0 && (
                   <>
-                    <div className="border-t border-zinc-200/60 dark:border-zinc-800/60" />
+                    <div className="border-t border-border/30 mx-3" />
                     <button
                       onClick={() => { clearAllFilters(); setFiltersOpen(false); }}
-                      className="flex items-center gap-1.5 w-full px-3 py-2 text-[10px] font-mono text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/3 transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 w-full px-3.5 py-2.5 text-[10px] font-mono text-muted-foreground/60 hover:text-foreground transition-colors cursor-pointer"
                     >
                       <X className="w-3 h-3" />
                       Clear all filters
@@ -559,23 +585,52 @@ export function IssuesList({
             )}
           </div>
 
-          <ClearFiltersButton show={activeFilterCount > 0} onClear={clearAllFilters} />
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearAllFilters}
+              className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-mono text-muted-foreground/50 hover:text-foreground transition-colors cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+              Clear
+            </button>
+          )}
 
           <div className="ml-auto">
             <CreateIssueDialog owner={owner} repo={repo} />
           </div>
         </div>
 
-        {/* Row 2: Count */}
-        <p className="text-xs text-muted-foreground/50 font-mono mb-3">
-          Showing {filtered.length} of{" "}
-          {authorIssues
-            ? baseIssues.length
-            : state === "open"
-              ? openCount
-              : closedCount}{" "}
-          issues
-        </p>
+        {/* Row 2: State tabs */}
+        <div className="flex items-center border-b border-border/40">
+          {([
+            { key: "open" as TabState, label: "Open", icon: <CircleDot className="w-3 h-3" />, count: authorIssues ? currentOpenIssues.length : openCount },
+            { key: "closed" as TabState, label: "Closed", icon: <CheckCircle2 className="w-3 h-3" />, count: authorIssues ? closedCompleted.length : closedCount - closedNotPlanned.length },
+            { key: "not_planned" as TabState, label: "Not Planned", icon: <CircleSlash className="w-3 h-3" />, count: closedNotPlanned.length },
+          ]).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setState(tab.key)}
+              className={cn(
+                "relative flex items-center gap-1.5 px-3 pb-2.5 pt-1 text-[12px] transition-colors cursor-pointer",
+                state === tab.key
+                  ? "text-foreground"
+                  : "text-muted-foreground/50 hover:text-foreground/70"
+              )}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className={cn(
+                "text-[10px] tabular-nums font-mono",
+                state === tab.key ? "text-foreground/50" : "text-muted-foreground/30"
+              )}>
+                {tab.count}
+              </span>
+              {state === tab.key && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Issue List */}
@@ -587,13 +642,13 @@ export function IssuesList({
           return (
             <Link
               key={issue.id}
-              href={`/repos/${owner}/${repo}/issues/${issue.number}`}
+              href={`/${owner}/${repo}/issues/${issue.number}`}
               className="group flex items-start gap-3 px-4 py-3 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors"
             >
               {issue.state === "open" ? (
-                <CircleDot className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-500" />
+                <CircleDot className="w-3.5 h-3.5 shrink-0 mt-0.5 text-success" />
               ) : (
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-purple-400" />
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-alert-important" />
               )}
               <div className="flex-1 min-w-0">
                 {/* Row 1: Title + Milestone badge + Labels + Assignee avatars */}
@@ -602,7 +657,7 @@ export function IssuesList({
                     {issue.title}
                   </span>
                   {issue.milestone && (
-                    <span className="text-[9px] font-mono px-1.5 py-0.5 border border-zinc-300/60 dark:border-zinc-700/60 text-muted-foreground/70 shrink-0">
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 border border-border/60 text-muted-foreground/70 shrink-0">
                       {issue.milestone.title}
                     </span>
                   )}
@@ -622,7 +677,7 @@ export function IssuesList({
                           alt={a.login}
                           width={16}
                           height={16}
-                          className="rounded-full border border-zinc-200 dark:border-zinc-800"
+                          className="rounded-full border border-border"
                           title={`Assignee: ${a.login}`}
                         />
                       ))}
@@ -685,7 +740,7 @@ export function IssuesList({
 
         {filtered.length === 0 && (
           <div className="py-16 text-center">
-            <CircleDot className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+            <CircleDot className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-xs text-muted-foreground font-mono">
               {search || activeFilterCount > 0
                 ? "No issues match your filters"

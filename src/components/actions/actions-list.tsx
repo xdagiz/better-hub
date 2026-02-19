@@ -155,8 +155,8 @@ export function ActionsList({
                 className={cn(
                   "text-[9px] px-1.5 py-0.5 border",
                   statusFilter === tab.value
-                    ? "border-zinc-300 dark:border-zinc-700 text-foreground/60"
-                    : "border-zinc-200 dark:border-zinc-800 text-muted-foreground/50"
+                    ? "border-border text-foreground/60"
+                    : "border-border text-muted-foreground/50"
                 )}
               >
                 {count}
@@ -174,7 +174,7 @@ export function ActionsList({
           return (
             <Link
               key={run.id}
-              href={`/repos/${owner}/${repo}/actions/${run.id}`}
+              href={`/${owner}/${repo}/actions/${run.id}`}
               className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors"
             >
               <StatusIcon
@@ -232,7 +232,7 @@ export function ActionsList({
 
         {filteredRuns.length === 0 && (
           <div className="py-16 text-center">
-            <Play className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+            <Play className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-xs text-muted-foreground font-mono">
               No workflow runs found
             </p>

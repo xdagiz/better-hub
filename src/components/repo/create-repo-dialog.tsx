@@ -87,7 +87,7 @@ export function CreateRepoDialog() {
       if (result.success && result.full_name) {
         setOpen(false);
         reset();
-        router.push(`/repos/${result.full_name}`);
+        router.push(`/${result.full_name}`);
       } else {
         setError(result.error || "Failed to create repository");
       }
@@ -242,7 +242,7 @@ export function CreateRepoDialog() {
 
           {/* Error */}
           {error && (
-            <p className="text-xs text-red-500 font-mono">{error}</p>
+            <p className="text-xs text-destructive font-mono">{error}</p>
           )}
 
           {/* Submit */}

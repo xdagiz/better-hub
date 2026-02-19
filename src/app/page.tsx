@@ -3,6 +3,7 @@
 import { signIn, useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useTheme } from "next-themes";
 import { Logo } from "@/components/ui/logo";
 import { HalftoneBackground } from "@/components/ui/halftone-background";
 import { AgentIcon } from "@/components/ui/agent-icon";
@@ -35,6 +36,11 @@ function ArrowRightIcon({ className }: { className?: string }) {
 export default function LoginPage() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    setTheme("light");
+  }, [setTheme]);
 
   useEffect(() => {
     if (session) {

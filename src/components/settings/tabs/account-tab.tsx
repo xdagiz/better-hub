@@ -135,7 +135,7 @@ export function AccountTab({ user, connectedAccounts }: AccountTabProps) {
 
       {/* Danger Zone */}
       <div className="px-4 py-4">
-        <label className="text-[11px] font-mono uppercase tracking-wider text-red-500/70">
+        <label className="text-[11px] font-mono uppercase tracking-wider text-destructive/70">
           Danger Zone
         </label>
         <p className="mt-1 text-[10px] text-muted-foreground/50 font-mono">
@@ -148,8 +148,8 @@ export function AccountTab({ user, connectedAccounts }: AccountTabProps) {
             className={cn(
               "flex items-center gap-1.5 border px-3 py-1.5 text-xs font-mono transition-colors cursor-pointer",
               confirmDelete
-                ? "border-red-500 bg-red-500 text-white hover:bg-red-600"
-                : "border-red-500/30 text-red-500/70 hover:text-red-500 hover:bg-red-500/5"
+                ? "border-destructive bg-destructive text-white hover:bg-destructive/90"
+                : "border-destructive/30 text-destructive/70 hover:text-destructive hover:bg-destructive/5"
             )}
           >
             <Trash2 className="w-3 h-3" />

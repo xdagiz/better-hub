@@ -74,7 +74,7 @@ function RepoRow({ repo, showOwner = true }: { repo: Repo; showOwner?: boolean }
 
   return (
     <Link
-      href={`/repos/${repo.full_name}`}
+      href={`/${repo.full_name}`}
       className="group flex gap-3.5 px-4 py-3.5 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors"
     >
       {/* Language accent */}
@@ -105,19 +105,19 @@ function RepoRow({ repo, showOwner = true }: { repo: Repo; showOwner?: boolean }
             )}
           </span>
           {repo.private && (
-            <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-zinc-300/60 dark:border-zinc-700/60 text-muted-foreground rounded-full">
+            <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-border/60 text-muted-foreground rounded-full">
               <Lock className="w-2 h-2" />
               Private
             </span>
           )}
           {repo.archived && (
-            <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-amber-400/30 text-amber-600 dark:text-amber-400/80 rounded-full">
+            <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-warning/30 text-warning rounded-full">
               <Archive className="w-2 h-2" />
               Archived
             </span>
           )}
           {repo.fork && (
-            <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-zinc-300/60 dark:border-zinc-700/60 text-muted-foreground rounded-full">
+            <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-border/60 text-muted-foreground rounded-full">
               <GitFork className="w-2 h-2" />
               Fork
             </span>
@@ -170,8 +170,8 @@ function RepoCard({ repo }: { repo: Repo }) {
 
   return (
     <Link
-      href={`/repos/${repo.full_name}`}
-      className="group flex flex-col border border-border rounded-md p-4 hover:bg-muted/50 dark:hover:bg-white/[0.02] hover:border-zinc-300/80 dark:hover:border-zinc-700/80 transition-colors"
+      href={`/${repo.full_name}`}
+      className="group flex flex-col border border-border rounded-md p-4 hover:bg-muted/50 dark:hover:bg-white/[0.02] hover:border-border transition-colors"
     >
       {/* Name */}
       <div className="flex items-center gap-2 min-w-0">
@@ -189,7 +189,7 @@ function RepoCard({ repo }: { repo: Repo }) {
       </p>
 
       {/* Footer */}
-      <div className="flex items-center gap-3 mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800/50 text-[11px] text-muted-foreground/60">
+      <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/60 text-[11px] text-muted-foreground/60">
         {langColor && (
           <span className="flex items-center gap-1.5 font-mono">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: langColor }} />
@@ -334,7 +334,7 @@ export function ReposContent({ repos }: { repos: Repo[] }) {
           </button>
 
           {sortOpen && (
-            <div className="absolute top-full right-0 mt-1.5 w-48 bg-white dark:bg-zinc-950 border border-border rounded-md shadow-lg dark:shadow-2xl z-50 py-1">
+            <div className="absolute top-full right-0 mt-1.5 w-48 bg-background border border-border rounded-md shadow-lg dark:shadow-2xl z-50 py-1">
               {(
                 [
                   ["updated", "Last updated"],
@@ -388,7 +388,7 @@ export function ReposContent({ repos }: { repos: Repo[] }) {
               className={cn(
                 "flex items-center gap-1.5 px-2 py-1 text-[11px] font-mono transition-colors cursor-pointer rounded",
                 view === key
-                  ? "bg-background dark:bg-zinc-800 text-foreground shadow-sm"
+                  ? "bg-background dark:bg-muted text-foreground shadow-sm"
                   : "text-muted-foreground/60 hover:text-foreground"
               )}
               title={label}
@@ -507,7 +507,7 @@ export function ReposContent({ repos }: { repos: Repo[] }) {
                   {orgRepos.length}
                 </span>
               </Link>
-              <div className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+              <div className="divide-y divide-border/60">
                 {orgRepos.map((repo) => (
                   <RepoRow key={repo.id} repo={repo} showOwner={false} />
                 ))}
@@ -516,7 +516,7 @@ export function ReposContent({ repos }: { repos: Repo[] }) {
           ))}
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto border border-border rounded-md divide-y divide-zinc-100 dark:divide-zinc-800/50">
+        <div className="flex-1 min-h-0 overflow-y-auto border border-border rounded-md divide-y divide-border/60">
           {filtered.map((repo) => (
             <RepoRow key={repo.id} repo={repo} />
           ))}

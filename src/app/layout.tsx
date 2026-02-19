@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { ColorThemeProvider } from "@/components/theme/theme-provider";
+import { generateThemeScript } from "@/lib/theme-script";
+import { listThemes } from "@/lib/themes";
 import "./globals.css";
-import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,13 +35,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-      {/* {process.env.NODE_ENV === "development" && (
-          <Script
-            src="//unpkg.com/react-grab/dist/index.global.js"
-            crossOrigin="anonymous"
-            strategy="beforeInteractive"
-          />
-        )} */}
+        <script dangerouslySetInnerHTML={{ __html: generateThemeScript(listThemes()) }} />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} antialiased`}
@@ -47,10 +43,11 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
-          enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <ColorThemeProvider>
+            {children}
+          </ColorThemeProvider>
         </ThemeProvider>
       </body>
     </html>

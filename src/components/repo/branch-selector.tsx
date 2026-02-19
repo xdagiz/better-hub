@@ -54,9 +54,9 @@ export function BranchSelector({
     setSearch("");
     const pathSuffix = currentPath ? `/${currentPath}` : "";
     if (currentPath) {
-      router.push(`/repos/${owner}/${repo}/${pathType}/${ref}${pathSuffix}`);
+      router.push(`/${owner}/${repo}/${pathType}/${ref}${pathSuffix}`);
     } else {
-      router.push(`/repos/${owner}/${repo}/tree/${ref}`);
+      router.push(`/${owner}/${repo}/tree/${ref}`);
     }
   }
 

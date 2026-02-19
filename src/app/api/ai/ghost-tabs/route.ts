@@ -5,6 +5,7 @@ import {
   addGhostTab,
   closeGhostTab,
   setActiveGhostTab,
+  renameGhostTab,
 } from "@/lib/chat-store";
 
 async function getSessionUserId(): Promise<string | null> {
@@ -45,6 +46,13 @@ export async function POST(req: Request) {
         return Response.json({ error: "tabId required" }, { status: 400 });
       }
       closeGhostTab(userId, tabId, newDefault);
+      return Response.json({ ok: true });
+    }
+    case "rename": {
+      if (!tabId || !label) {
+        return Response.json({ error: "tabId, label required" }, { status: 400 });
+      }
+      renameGhostTab(userId, tabId, label);
       return Response.json({ ok: true });
     }
     case "switch": {

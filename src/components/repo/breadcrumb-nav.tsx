@@ -24,8 +24,8 @@ export function BreadcrumbNav({
     const isLast = i === segments.length - 1;
     const href =
       isLast && isFile
-        ? `/repos/${owner}/${repo}/blob/${currentRef}/${encodeFilePath(partialPath)}`
-        : `/repos/${owner}/${repo}/tree/${currentRef}/${encodeFilePath(partialPath)}`;
+        ? `/${owner}/${repo}/blob/${currentRef}/${encodeFilePath(partialPath)}`
+        : `/${owner}/${repo}/tree/${currentRef}/${encodeFilePath(partialPath)}`;
 
     return { label: segment, href, isLast };
   });
@@ -33,7 +33,7 @@ export function BreadcrumbNav({
   return (
     <nav className="flex items-center gap-1 text-xs font-mono overflow-x-auto">
       <Link
-        href={`/repos/${owner}/${repo}`}
+        href={`/${owner}/${repo}`}
         className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
       >
         {repo}

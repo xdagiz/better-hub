@@ -27,22 +27,16 @@ import { PRCommentForm } from "@/components/pr/pr-comment-form";
 import { PRReviewForm } from "@/components/pr/pr-review-form";
 import { ChatPageActivator } from "@/components/shared/chat-page-activator";
 import { TrackView } from "@/components/shared/track-view";
-import { AddToCollection } from "@/components/collections/add-to-collection";
-import { CollectionNavBar } from "@/components/collections/collection-nav-bar";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { getCollection, getItems } from "@/lib/collections-store";
 import { inngest } from "@/lib/inngest";
 
 export default async function PRDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ owner: string; repo: string; number: string }>;
-  searchParams: Promise<{ collection?: string }>;
 }) {
   const { owner, repo, number: numStr } = await params;
-  const { collection: collectionId } = await searchParams;
   const pullNumber = parseInt(numStr, 10);
 
   const [pr, files, comments, reviews, threads, commits, repoData, currentUser] = await Promise.all([
@@ -72,7 +66,7 @@ export default async function PRDetailPage({
     }
   }
 
-  // Fetch session unconditionally (used for collections + embedding trigger)
+  // Fetch session unconditionally (used for embedding trigger)
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!pr) {
@@ -274,59 +268,11 @@ export default async function PRDetailPage({
     ),
   ]);
 
-  // Collection navigation context
-  let collectionContext: {
-    collectionId: string;
-    collectionName: string;
-    currentIndex: number;
-    totalItems: number;
-    currentItemId: string;
-    currentReviewed: boolean;
-    prevHref: string | null;
-    nextHref: string | null;
-  } | null = null;
-
-  if (collectionId) {
-    if (session?.user?.id) {
-      const collection = getCollection(collectionId, session.user.id);
-      if (collection) {
-        const items = getItems(collectionId, session.user.id);
-        const idx = items.findIndex(
-          (i) =>
-            i.owner === owner &&
-            i.repo === repo &&
-            i.prNumber === pullNumber
-        );
-        if (idx !== -1) {
-          const prev = idx > 0 ? items[idx - 1] : null;
-          const next = idx < items.length - 1 ? items[idx + 1] : null;
-          collectionContext = {
-            collectionId: collection.id,
-            collectionName: collection.name,
-            currentIndex: idx,
-            totalItems: items.length,
-            currentItemId: items[idx].id,
-            currentReviewed: items[idx].reviewed,
-            prevHref: prev
-              ? `/repos/${prev.owner}/${prev.repo}/pulls/${prev.prNumber}?collection=${collectionId}`
-              : null,
-            nextHref: next
-              ? `/repos/${next.owner}/${next.repo}/pulls/${next.prNumber}?collection=${collectionId}`
-              : null,
-          };
-        }
-      }
-    }
-  }
-
   return (
     <>
-    {collectionContext && (
-      <CollectionNavBar {...collectionContext} />
-    )}
     <TrackView
       type="pr"
-      url={`/repos/${owner}/${repo}/pulls/${pullNumber}`}
+      url={`/${owner}/${repo}/pulls/${pullNumber}`}
       title={pr.title}
       subtitle={`${owner}/${repo}`}
       number={pullNumber}
@@ -361,12 +307,6 @@ export default async function PRDetailPage({
             canEdit={canWrite || pr.user?.login === currentUser?.login}
             actions={
               <div className="flex items-center gap-2">
-                <AddToCollection
-                  owner={owner}
-                  repo={repo}
-                  prNumber={pr.number}
-                  prTitle={pr.title}
-                />
                 {isOpen && (
                   <PRReviewForm
                     owner={owner}

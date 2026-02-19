@@ -107,7 +107,7 @@ export function OrgsContent({ orgs }: { orgs: OrgListItem[] }) {
 
         {filtered.length === 0 && (
           <div className="py-16 text-center">
-            <Building2 className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+            <Building2 className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-xs text-muted-foreground font-mono">
               No organizations found
             </p>

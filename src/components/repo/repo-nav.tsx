@@ -11,12 +11,13 @@ interface RepoNavProps {
   openIssuesCount?: number;
   openPrsCount?: number;
   activeRunsCount?: number;
+  promptRequestsCount?: number;
   showPeopleTab?: boolean;
 }
 
-export function RepoNav({ owner, repo, openIssuesCount, openPrsCount, activeRunsCount, showPeopleTab }: RepoNavProps) {
+export function RepoNav({ owner, repo, openIssuesCount, openPrsCount, activeRunsCount, promptRequestsCount, showPeopleTab }: RepoNavProps) {
   const pathname = usePathname();
-  const base = `/repos/${owner}/${repo}`;
+  const base = `/${owner}/${repo}`;
   const containerRef = useRef<HTMLDivElement>(null);
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [hasAnimated, setHasAnimated] = useState(false);
@@ -46,6 +47,12 @@ export function RepoNav({ owner, repo, openIssuesCount, openPrsCount, activeRuns
       href: `${base}/issues`,
       active: pathname.startsWith(`${base}/issues`),
       count: openIssuesCount,
+    },
+    {
+      label: "Prompts",
+      href: `${base}/prompts`,
+      active: pathname.startsWith(`${base}/prompts`),
+      count: promptRequestsCount,
     },
     ...(showPeopleTab
       ? [
@@ -115,8 +122,8 @@ export function RepoNav({ owner, repo, openIssuesCount, openPrsCount, activeRuns
               className={cn(
                 "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
                 tab.active
-                  ? "bg-zinc-200 dark:bg-zinc-800 text-foreground/70"
-                  : "bg-zinc-100 dark:bg-zinc-800/50 text-muted-foreground/60"
+                  ? "bg-muted text-foreground/70"
+                  : "bg-muted/50 text-muted-foreground/60"
               )}
             >
               {tab.count}

@@ -4,7 +4,7 @@ import { convertToModelMessages, stepCountIs, streamText, tool } from "ai";
 import { z } from "zod";
 import { getOctokitFromSession, getGitHubToken } from "@/lib/ai-auth";
 import type { Octokit } from "@octokit/rest";
-import { Sandbox } from "e2b";
+import { Sandbox } from "@vercel/sandbox";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { embedText } from "@/lib/mixedbread";
@@ -12,6 +12,18 @@ import { rerankResults } from "@/lib/mixedbread";
 import { searchEmbeddings, type ContentType } from "@/lib/embedding-store";
 import { toAppUrl } from "@/lib/github-utils";
 import { getUserSettings } from "@/lib/user-settings-store";
+import {
+  createPromptRequest as createPromptRequestInDb,
+  updatePromptRequestStatus,
+  updatePromptRequestContent,
+  getPromptRequest as getPromptRequestFromDb,
+} from "@/lib/prompt-request-store";
+import {
+  invalidateIssueCache,
+  invalidatePullRequestCache,
+  invalidateRepoIssuesCache,
+  invalidateRepoPullRequestsCache,
+} from "@/lib/github";
 
 export const maxDuration = 300;
 
@@ -77,7 +89,7 @@ interface PageContext {
 
 // ─── Tool Factories ─────────────────────────────────────────────────────────
 
-function getGeneralTools(octokit: Octokit) {
+function getGeneralTools(octokit: Octokit, pageContext?: PageContext, userId?: string) {
   return {
     searchRepos: tool({
       description:
@@ -523,10 +535,33 @@ function getGeneralTools(octokit: Octokit) {
       description:
         "Refresh the current page to reflect changes. Call this AFTER any mutation that affects the current UI — e.g. after starring a repo while on that repo's page, after closing an issue while viewing it, after merging a PR, after commenting, after adding labels, etc. Only call once at the end of your response, not after every tool call.",
       inputSchema: z.object({}),
-      execute: async () => ({
-        _clientAction: "refreshPage" as const,
-        success: true,
-      }),
+      execute: async () => {
+        // Invalidate local caches so router.refresh() picks up fresh data
+        const path = pageContext?.pathname || "";
+        const issueMatch = path.match(/^\/repos\/([^/]+)\/([^/]+)\/issues\/(\d+)/);
+        const prMatch = path.match(/^\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)/);
+        const issueListMatch = path.match(/^\/repos\/([^/]+)\/([^/]+)\/issues\/?$/);
+        const prListMatch = path.match(/^\/repos\/([^/]+)\/([^/]+)\/pulls\/?$/);
+
+        if (issueMatch) {
+          const [, owner, repo, num] = issueMatch;
+          await invalidateIssueCache(owner, repo, parseInt(num, 10));
+        } else if (prMatch) {
+          const [, owner, repo, num] = prMatch;
+          await invalidatePullRequestCache(owner, repo, parseInt(num, 10));
+        } else if (issueListMatch) {
+          const [, owner, repo] = issueListMatch;
+          await invalidateRepoIssuesCache(owner, repo);
+        } else if (prListMatch) {
+          const [, owner, repo] = prListMatch;
+          await invalidateRepoPullRequestsCache(owner, repo);
+        }
+
+        return {
+          _clientAction: "refreshPage" as const,
+          success: true,
+        };
+      },
     }),
 
     navigateTo: tool({
@@ -543,7 +578,6 @@ function getGeneralTools(octokit: Octokit) {
             "settings",
             "search",
             "trending",
-            "collections",
             "orgs",
           ])
           .describe("Target page"),
@@ -947,6 +981,79 @@ Only GET requests are allowed. For mutations use the dedicated tools.`,
           remaining_assignees: (data.assignees || []).map(
             (a: any) => a.login
           ),
+        };
+      },
+    }),
+
+    createPromptRequest: tool({
+      description:
+        "Create a prompt request for a repository. Use when the user wants to capture an idea, feature request, bug fix, or refactor as a prompt request. Summarize the conversation into clear, actionable instructions in the body.",
+      inputSchema: z.object({
+        owner: z.string().describe("Repository owner"),
+        repo: z.string().describe("Repository name"),
+        title: z.string().describe("Short descriptive title for the prompt request"),
+        body: z
+          .string()
+          .describe(
+            "Detailed instructions for the changes. Be specific about what files to change, what logic to add, etc."
+          ),
+      }),
+      execute: async ({ owner, repo, title, body }) => {
+        if (!userId) return { error: "Not authenticated" };
+        const pr = createPromptRequestInDb(userId, owner, repo, title, body);
+        return {
+          _clientAction: "openPromptRequests" as const,
+          success: true,
+          id: pr.id,
+          title: pr.title,
+          owner,
+          repo,
+          url: `/${owner}/${repo}/prompts/${pr.id}`,
+        };
+      },
+    }),
+
+    completePromptRequest: tool({
+      description:
+        "Mark a prompt request as completed after creating a PR for it. Use after sandboxCreatePR or createPullRequest when processing a prompt request.",
+      inputSchema: z.object({
+        promptRequestId: z.string().describe("The prompt request ID to mark as completed"),
+        prNumber: z.number().describe("The PR number that was created"),
+      }),
+      execute: async ({ promptRequestId, prNumber }) => {
+        updatePromptRequestStatus(promptRequestId, "completed", { prNumber });
+        return {
+          _clientAction: "refreshPage" as const,
+          success: true,
+          promptRequestId,
+          prNumber,
+        };
+      },
+    }),
+
+    editPromptRequest: tool({
+      description:
+        "Edit an existing prompt request's title and/or body. Use when the user asks to update, refine, or change a prompt request they are currently viewing.",
+      inputSchema: z.object({
+        promptRequestId: z.string().describe("The prompt request ID to edit"),
+        title: z.string().optional().describe("New title (omit to keep current)"),
+        body: z.string().optional().describe("New body/instructions (omit to keep current)"),
+      }),
+      execute: async ({ promptRequestId, title, body }) => {
+        const existing = getPromptRequestFromDb(promptRequestId);
+        if (!existing) return { error: "Prompt request not found" };
+        if (existing.status !== "open") return { error: "Can only edit open prompt requests" };
+
+        const updated = updatePromptRequestContent(promptRequestId, {
+          ...(title !== undefined ? { title } : {}),
+          ...(body !== undefined ? { body } : {}),
+        });
+
+        return {
+          _clientAction: "refreshPage" as const,
+          success: true,
+          promptRequestId,
+          title: updated?.title,
         };
       },
     }),
@@ -1706,7 +1813,7 @@ ${inlineContextPrompt}
 - **ALWAYS call refreshPage** after any mutation that affects the current page (star, comment, close issue, merge PR, add labels, etc.). Call it once at the end, after all mutations are done.
 - **ALWAYS navigate within the app** — never send users to github.com when there's an in-app page.
 - **NEVER say you can't perform git operations.** You have a cloud sandbox (startSandbox → sandboxRun) that gives you a full Linux VM with git. Use it for cherry-pick, rebase, merge, revert, bisect, conflict resolution, or ANY git operation. Just spin up the sandbox and do it.
-- Use navigateTo for top-level pages: dashboard, repos, prs, issues, notifications, settings, search, trending, collections, orgs.
+- Use navigateTo for top-level pages: dashboard, repos, prs, issues, notifications, settings, search, trending, orgs.
 - Use openRepo to navigate to a specific repository.
 - Use openRepoTab to navigate to a repo section: actions, commits, issues, pulls, people, security, settings.
 - Use openWorkflowRun to navigate to a specific workflow run / GitHub Action.
@@ -1717,7 +1824,7 @@ ${inlineContextPrompt}
 - Only use openUrl for truly external URLs with no in-app equivalent.
 
 ## Available Navigation
-- **Top-level pages:** dashboard, repos, prs, issues, notifications, settings, search, trending, collections, orgs
+- **Top-level pages:** dashboard, repos, prs, issues, notifications, settings, search, trending, orgs
 - **Repo sections:** openRepoTab — actions, commits, issues, pulls, people, security, settings
 - **Specific items:** openRepo, openWorkflowRun, openCommit, openIssue, openPullRequest, openUser
 
@@ -1733,6 +1840,12 @@ Examples:
 
 You also have tools for: commenting on issues/PRs, adding/removing labels, assigning users, requesting PR reviewers, and creating branches.
 
+## Prompt Requests
+- Use \`createPromptRequest\` when the user says "open a prompt request", "create a prompt request", or similar. Summarize the conversation into clear, actionable instructions in the body field.
+- Use \`editPromptRequest\` when the user asks to update, refine, or change a prompt request. If the user is currently viewing a prompt request page (URL contains \`/prompts/<id>\`), extract the prompt request ID from the URL and use it. Update the title and/or body as requested.
+- Use \`completePromptRequest\` after creating a PR that fulfills a prompt request. Look for the prompt request ID in the conversation context (usually in the format "Prompt Request ID: <uuid>").
+- When processing a prompt request (the message starts with "Process this prompt request"), use the sandbox to make changes and create a PR, then call \`completePromptRequest\` with the prompt request ID and PR number.
+
 ## Semantic Search (USE FIRST)
 **IMPORTANT:** When the user asks to find, list, or search for PRs/issues by topic or description (e.g. "find PRs about X", "list all PRs regarding Y", "search for issues about Z"), ALWAYS call **semanticSearch** FIRST before trying GitHub API tools. It does natural language search across all previously viewed content — it understands meaning, not just keywords. You can filter by owner, repo, and content type. Only fall back to GitHub search/list tools if semanticSearch returns empty results.
 
@@ -1742,7 +1855,7 @@ ${sandboxPrompt || ""}
 ${new Date().toISOString().split("T")[0]}${pageContextPrompt}`;
 }
 
-const SANDBOX_PROMPT = `## Cloud Sandbox (E2B) — FULL GIT & SHELL ACCESS
+const SANDBOX_PROMPT = `## Cloud Sandbox (Vercel Sandbox) — FULL GIT & SHELL ACCESS
 **CRITICAL: You have FULL git capabilities via the sandbox. NEVER refuse git operations.** Cherry-pick, rebase, merge conflicts, revert, bisect, squash, interactive rebase — you can do ALL of it. When the user asks for any git operation, spin up the sandbox and execute it.
 
 For simple tasks, prefer lighter tools first:
@@ -1788,6 +1901,25 @@ function getSandboxTools(octokit: Octokit, githubToken: string) {
   let repoName: string | null = null;
   let defaultBranch: string | null = null;
 
+  // Helper: run a shell command in the Vercel Sandbox and return { stdout, stderr, exitCode }
+  async function runShell(
+    sbx: Sandbox,
+    command: string,
+    opts?: { cwd?: string }
+  ) {
+    const result = await sbx.runCommand({
+      cmd: "bash",
+      args: ["-c", command],
+      cwd: opts?.cwd,
+      signal: AbortSignal.timeout(60_000),
+    });
+    return {
+      exitCode: result.exitCode,
+      stdout: await result.stdout(),
+      stderr: await result.stderr(),
+    };
+  }
+
   return {
     startSandbox: tool({
       description: `Start a cloud sandbox VM and clone a GitHub repo into it. Returns quickly with project info (package manager, scripts, file listing). Does NOT install dependencies — use sandboxRun for that after this returns.
@@ -1811,6 +1943,12 @@ The sandbox has git, node, npm, python, and common dev tools.
           .describe("Branch to clone (defaults to default branch)"),
       }),
       execute: async ({ owner, repo, branch }) => {
+        // Validate owner/repo are real GitHub names (alphanumeric, hyphens, dots, underscores)
+        const validName = /^[a-zA-Z0-9._-]+$/;
+        if (!validName.test(owner) || !validName.test(repo)) {
+          return { error: `Invalid owner/repo: "${owner}/${repo}". Provide valid GitHub owner and repository names.` };
+        }
+
         if (sandbox) {
           return {
             error:
@@ -1821,7 +1959,10 @@ The sandbox has git, node, npm, python, and common dev tools.
         // ── Phase 1: Create sandbox ──
         console.log("[Sandbox] Creating sandbox...");
         try {
-          sandbox = await Sandbox.create({ timeoutMs: 5 * 60 * 1000 });
+          sandbox = await Sandbox.create({
+            timeout: 5 * 60 * 1000,
+            runtime: "node24",
+          });
           console.log("[Sandbox] Created:", sandbox.sandboxId);
         } catch (e: any) {
           console.error("[Sandbox] Create FAILED:", e.message);
@@ -1834,11 +1975,12 @@ The sandbox has git, node, npm, python, and common dev tools.
         try {
           // Configure git and set up credential helper so all subsequent
           // git operations (fetch, push, cherry-pick, rebase) have auth
-          await sandbox.commands.run(
-            `git config --global user.name "Ghost" && git config --global user.email "ghost@better-github.app" && git config --global credential.helper store && echo "https://x-access-token:${githubToken}@github.com" > ~/.git-credentials`
+          await runShell(
+            sandbox,
+            `git config --global user.name "Ghost" && git config --global user.email "ghost@better-github.app" && git config --global credential.helper store && echo "https://x-access-token:${githubToken}@github.com" > $HOME/.git-credentials`
           );
 
-          repoPath = `/home/user/${repo}`;
+          repoPath = `/vercel/sandbox/${repo}`;
           repoOwner = owner;
           repoName = repo;
 
@@ -1846,20 +1988,18 @@ The sandbox has git, node, npm, python, and common dev tools.
           const cloneCmd = branch
             ? `git clone --branch ${branch} ${cloneUrl} ${repoPath}`
             : `git clone ${cloneUrl} ${repoPath}`;
-          const cloneResult = await sandbox.commands.run(cloneCmd, {
-            timeoutMs: 60_000,
-          });
+          const cloneResult = await runShell(sandbox, cloneCmd);
 
           if (cloneResult.exitCode !== 0) {
             console.error("[Sandbox] Clone failed:", cloneResult.stderr);
-            await sandbox.kill().catch(() => {});
+            await sandbox.stop().catch(() => {});
             sandbox = null;
             return { error: `Clone failed: ${cloneResult.stderr}` };
           }
           console.log("[Sandbox] Clone OK");
         } catch (e: any) {
           console.error("[Sandbox] Clone error:", e.message);
-          if (sandbox) await sandbox.kill().catch(() => {});
+          if (sandbox) await sandbox.stop().catch(() => {});
           sandbox = null;
           return { error: `Clone error: ${e.message}` };
         }
@@ -1867,19 +2007,29 @@ The sandbox has git, node, npm, python, and common dev tools.
         // ── Phase 3: Detect project (lightweight, no installs) ──
         console.log("[Sandbox] Detecting project...");
         try {
-          const [branchResult, dirEntries] = await Promise.all([
-            sandbox.commands.run("git rev-parse --abbrev-ref HEAD", {
+          const [branchResult, lsResult] = await Promise.all([
+            runShell(sandbox, "git rev-parse --abbrev-ref HEAD", {
               cwd: repoPath,
             }),
-            sandbox.files.list(repoPath),
+            runShell(sandbox, "ls -1", { cwd: repoPath }),
           ]);
           defaultBranch = branchResult.stdout.trim();
-          const topLevelFiles = dirEntries.map((e) => e.name);
-          console.log("[Sandbox] Branch:", defaultBranch, "Files:", topLevelFiles.length);
+          const topLevelFiles = lsResult.stdout
+            .trim()
+            .split("\n")
+            .filter(Boolean);
+          console.log(
+            "[Sandbox] Branch:",
+            defaultBranch,
+            "Files:",
+            topLevelFiles.length
+          );
 
           const hasPnpm = topLevelFiles.includes("pnpm-lock.yaml");
           const hasYarn = topLevelFiles.includes("yarn.lock");
-          const hasBun = topLevelFiles.includes("bun.lock") || topLevelFiles.includes("bun.lockb");
+          const hasBun =
+            topLevelFiles.includes("bun.lock") ||
+            topLevelFiles.includes("bun.lockb");
           const hasPkgJson = topLevelFiles.includes("package.json");
 
           let packageManager = "npm";
@@ -1892,7 +2042,8 @@ The sandbox has git, node, npm, python, and common dev tools.
             installHint = "yarn install";
           } else if (hasBun) {
             packageManager = "bun";
-            installHint = 'curl -fsSL https://bun.sh/install | bash && export PATH="$HOME/.bun/bin:$PATH" && bun install';
+            installHint =
+              'curl -fsSL https://bun.sh/install | bash && export PATH="$HOME/.bun/bin:$PATH" && bun install';
           }
 
           let scripts: Record<string, string> = {};
@@ -1900,12 +2051,14 @@ The sandbox has git, node, npm, python, and common dev tools.
 
           if (hasPkgJson) {
             try {
-              const pkgContent = await sandbox.files.read(
-                `${repoPath}/package.json`
-              );
-              const pkg = JSON.parse(pkgContent);
-              scripts = pkg.scripts || {};
-              if (pkg.workspaces) isMonorepo = true;
+              const buf = await sandbox.readFileToBuffer({
+                path: `${repoPath}/package.json`,
+              });
+              if (buf) {
+                const pkg = JSON.parse(buf.toString());
+                scripts = pkg.scripts || {};
+                if (pkg.workspaces) isMonorepo = true;
+              }
             } catch {
               // invalid package.json
             }
@@ -1915,7 +2068,12 @@ The sandbox has git, node, npm, python, and common dev tools.
             isMonorepo = true;
           }
 
-          console.log("[Sandbox] Ready:", packageManager, "monorepo:", isMonorepo);
+          console.log(
+            "[Sandbox] Ready:",
+            packageManager,
+            "monorepo:",
+            isMonorepo
+          );
 
           return {
             success: true,
@@ -1942,7 +2100,8 @@ The sandbox has git, node, npm, python, and common dev tools.
             availableScripts: {},
             isMonorepo: false,
             topLevelFiles: [],
-            nextStep: "Detection had issues. Use sandboxRun to explore the repo manually.",
+            nextStep:
+              "Detection had issues. Use sandboxRun to explore the repo manually.",
           };
         }
       },
@@ -1962,9 +2121,8 @@ The sandbox has git, node, npm, python, and common dev tools.
         if (!sandbox)
           return { error: "No sandbox running. Use startSandbox first." };
         try {
-          const result = await sandbox.commands.run(command, {
+          const result = await runShell(sandbox, command, {
             cwd: cwd || repoPath || undefined,
-            timeoutMs: 60_000,
           });
           // Truncate large output
           const maxLen = 8000;
@@ -1978,7 +2136,10 @@ The sandbox has git, node, npm, python, and common dev tools.
               : result.stderr;
 
           if (result.exitCode !== 0) {
-            const errMsg = stderr.trim() || stdout.trim() || `exit code ${result.exitCode}`;
+            const errMsg =
+              stderr.trim() ||
+              stdout.trim() ||
+              `exit code ${result.exitCode}`;
             return { error: errMsg, exitCode: result.exitCode, stdout, stderr };
           }
           return { success: true, stdout, stderr, exitCode: 0 };
@@ -2005,8 +2166,10 @@ The sandbox has git, node, npm, python, and common dev tools.
           const absPath = path.startsWith("/")
             ? path
             : `${repoPath}/${path}`;
-          const content = await sandbox.files.read(absPath);
-          if (typeof content === "string" && content.length > 30000) {
+          const buf = await sandbox.readFileToBuffer({ path: absPath });
+          if (!buf) return { error: `File not found: ${absPath}` };
+          const content = buf.toString();
+          if (content.length > 30000) {
             return {
               path: absPath,
               content: content.slice(0, 30000) + "\n...(truncated)",
@@ -2037,7 +2200,9 @@ The sandbox has git, node, npm, python, and common dev tools.
           const absPath = path.startsWith("/")
             ? path
             : `${repoPath}/${path}`;
-          await sandbox.files.write(absPath, content);
+          await sandbox.writeFiles([
+            { path: absPath, content: Buffer.from(content) },
+          ]);
           return { success: true, path: absPath };
         } catch (e: any) {
           return { error: e.message || "Failed to write file" };
@@ -2069,7 +2234,7 @@ The sandbox has git, node, npm, python, and common dev tools.
           return { error: "No sandbox running. Use startSandbox first." };
         try {
           const run = (cmd: string) =>
-            sandbox!.commands.run(cmd, { cwd: repoPath! });
+            runShell(sandbox!, cmd, { cwd: repoPath! });
 
           // Create and checkout branch if different from current
           const currentBranch = (
@@ -2098,9 +2263,7 @@ The sandbox has git, node, npm, python, and common dev tools.
           }
 
           // Check if there's anything to commit
-          const statusResult = await run(
-            "git diff --cached --stat"
-          );
+          const statusResult = await run("git diff --cached --stat");
           if (!statusResult.stdout.trim()) {
             return { error: "No staged changes to commit." };
           }
@@ -2114,9 +2277,7 @@ The sandbox has git, node, npm, python, and common dev tools.
           }
 
           // Push
-          const pushResult = await run(
-            `git push -u origin ${branch}`
-          );
+          const pushResult = await run(`git push -u origin ${branch}`);
           if (pushResult.exitCode !== 0) {
             return { error: `Push failed: ${pushResult.stderr}` };
           }
@@ -2183,12 +2344,12 @@ The sandbox has git, node, npm, python, and common dev tools.
       execute: async () => {
         if (!sandbox) return { success: true, message: "No sandbox running." };
         try {
-          await sandbox.kill();
+          await sandbox.stop();
           sandbox = null;
           repoPath = null;
           return { success: true, message: "Sandbox terminated." };
         } catch (e: any) {
-          return { error: e.message || "Failed to kill sandbox" };
+          return { error: e.message || "Failed to stop sandbox" };
         }
       },
     }),
@@ -2234,7 +2395,7 @@ export async function POST(req: Request) {
   let systemPrompt: string;
   let tools: Record<string, any>;
 
-  const generalTools = getGeneralTools(octokit);
+  const generalTools = getGeneralTools(octokit, pageContext, userId ?? undefined);
   const sandboxTools = githubToken ? getSandboxTools(octokit, githubToken) : {};
   const sandboxPrompt = githubToken ? SANDBOX_PROMPT : undefined;
   const searchTools = userId ? getSemanticSearchTool(userId) : {};

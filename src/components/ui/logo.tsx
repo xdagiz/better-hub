@@ -8,7 +8,7 @@ export function Logo({ className }: { className?: string }) {
         className
       )}
     >
-      better-hub.
+      BETTER-HUB.
     </span>
   );
 }

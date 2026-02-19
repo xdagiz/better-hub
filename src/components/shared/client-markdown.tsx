@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-import type { Highlighter } from "shiki";
+import { parseGitHubUrl, toInternalUrl } from "@/lib/github-utils";
+import { HighlightedCodeBlock } from "@/components/shared/highlighted-code-block";
 
 /** Convert @username in markdown source to links (skip inside code fences/backticks) */
 function linkifyMentionsMd(md: string): string {
@@ -20,83 +21,6 @@ function linkifyMentionsMd(md: string): string {
   }
   return parts.join("");
 }
-
-// Singleton highlighter for client-side code highlighting
-let highlighterInstance: Highlighter | null = null;
-let highlighterPromise: Promise<Highlighter> | null = null;
-
-function getClientHighlighter(): Promise<Highlighter> {
-  if (highlighterInstance) return Promise.resolve(highlighterInstance);
-  if (!highlighterPromise) {
-    highlighterPromise = import("shiki")
-      .then(({ createHighlighter }) =>
-        createHighlighter({
-          themes: ["vitesse-light", "vitesse-black"],
-          langs: [],
-        })
-      )
-      .then((h) => {
-        highlighterInstance = h;
-        return h;
-      });
-  }
-  return highlighterPromise;
-}
-
-const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
-  code,
-  lang,
-}: {
-  code: string;
-  lang: string;
-}) {
-  const [html, setHtml] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const highlighter = await getClientHighlighter();
-        const loaded = highlighter.getLoadedLanguages();
-        let effectiveLang = lang;
-        if (!loaded.includes(lang as any)) {
-          try {
-            await highlighter.loadLanguage(lang as any);
-          } catch {
-            effectiveLang = "text";
-            if (!loaded.includes("text" as any)) {
-              try {
-                await highlighter.loadLanguage("text" as any);
-              } catch {}
-            }
-          }
-        }
-        if (!cancelled) {
-          const result = highlighter.codeToHtml(code, {
-            lang: effectiveLang,
-            themes: { light: "vitesse-light", dark: "vitesse-black" },
-            defaultColor: false,
-          });
-          setHtml(result);
-        }
-      } catch {
-        // silently fall back to plain text
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [code, lang]);
-
-  if (html) {
-    return <div dangerouslySetInnerHTML={{ __html: html }} />;
-  }
-  return (
-    <pre>
-      <code>{code}</code>
-    </pre>
-  );
-});
 
 export function ClientMarkdown({
   content,
@@ -141,13 +65,16 @@ export function ClientMarkdown({
           a({ href, children, ...rest }) {
             if (href?.startsWith("/users/")) {
               return (
-                <a href={href} className="ghmd-mention" {...rest}>
+                <Link href={href} className="ghmd-mention" {...rest}>
                   <svg className="ghmd-mention-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M10.561 8.073a6 6 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6 6 0 0 1 3.431-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z" /></svg>
                   {children}
-                </a>
+                </Link>
               );
             }
-            return <a href={href} {...rest}>{children}</a>;
+            if (href && parseGitHubUrl(href)) {
+              return <Link href={toInternalUrl(href)} {...rest}>{children}</Link>;
+            }
+            return <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>{children}</a>;
           },
         }}
       >

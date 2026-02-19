@@ -57,9 +57,10 @@ interface GlobalChatContextValue {
   setIsWorking: (working: boolean) => void;
   addCodeContext: (context: InlineContext) => void;
   registerContextHandler: (fn: AddCodeContextFn) => void;
-  addTab: () => void;
+  addTab: (label?: string) => void;
   closeTab: (tabId: string) => void;
   switchTab: (tabId: string) => void;
+  renameTab: (tabId: string, label: string) => void;
 }
 
 const GlobalChatContext = createContext<GlobalChatContextValue | null>(null);
@@ -91,23 +92,27 @@ export function GlobalChatProvider({ children, initialTabState }: GlobalChatProv
     suggestions: [],
     placeholder: "Ask Ghost...",
     emptyTitle: "Ghost",
-    emptyDescription: "Ask questions and get help",
+    emptyDescription: "Your haunted assistant for all things here.",
     repoFileSearch: null,
   });
 
   const [tabState, setTabState] = useState<GhostTabState>(initialTabState);
 
   const contextHandlerRef = useRef<AddCodeContextFn | null>(null);
+  // Track open state for synchronous keyboard shortcut checks
+  const isOpenRef = useRef(false);
+  // Track the contextKey when the panel was last closed, so we can detect context changes on reopen
+  const lastClosedContextKeyRef = useRef<string | null>(null);
 
   // ── Tab mutations (optimistic + fire-and-forget POST) ──────────────
 
-  const addTab = useCallback(() => {
+  const addTab = useCallback((contextLabel?: string) => {
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     let label = "";
     let counter = 0;
     setTabState((prev) => {
       counter = prev.counter + 1;
-      label = `Thread ${counter}`;
+      label = contextLabel || `Thread ${counter}`;
       return {
         tabs: [...prev.tabs, { id, label }],
         activeTabId: id,
@@ -162,6 +167,18 @@ export function GlobalChatProvider({ children, initialTabState }: GlobalChatProv
     }).catch(() => {});
   }, []);
 
+  const renameTab = useCallback((tabId: string, label: string) => {
+    setTabState((prev) => ({
+      ...prev,
+      tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, label } : t)),
+    }));
+    fetch("/api/ai/ghost-tabs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rename", tabId, label }),
+    }).catch(() => {});
+  }, []);
+
   // ── Existing chat state logic ──────────────────────────────────────
 
   const setContext = useCallback((config: ChatConfig) => {
@@ -173,7 +190,7 @@ export function GlobalChatProvider({ children, initialTabState }: GlobalChatProv
       suggestions: config.suggestions ?? [],
       placeholder: config.placeholder ?? "Ask Ghost...",
       emptyTitle: config.emptyTitle ?? "Ghost",
-      emptyDescription: config.emptyDescription ?? "Ask questions and get help",
+      emptyDescription: config.emptyDescription ?? "Your haunted assistant for all things here.",
       repoFileSearch: config.repoFileSearch ?? null,
     }));
   }, []);
@@ -187,7 +204,7 @@ export function GlobalChatProvider({ children, initialTabState }: GlobalChatProv
       suggestions: [],
       placeholder: "Ask Ghost...",
       emptyTitle: "Ghost",
-      emptyDescription: "Ask questions and get help",
+      emptyDescription: "Your haunted assistant for all things here.",
       repoFileSearch: null,
     }));
   }, []);
@@ -202,19 +219,38 @@ export function GlobalChatProvider({ children, initialTabState }: GlobalChatProv
   const openChat = useCallback((config: ChatConfig) => {
     setContext(config);
     setState((prev) => ({ ...prev, isOpen: true }));
+    isOpenRef.current = true;
     focusGhostInput();
   }, [setContext, focusGhostInput]);
 
   const closeChat = useCallback(() => {
-    setState((prev) => ({ ...prev, isOpen: false }));
+    setState((prev) => {
+      lastClosedContextKeyRef.current = prev.contextKey;
+      return { ...prev, isOpen: false };
+    });
+    isOpenRef.current = false;
   }, []);
 
   const toggleChat = useCallback(() => {
     setState((prev) => {
-      if (!prev.isOpen) focusGhostInput();
-      return { ...prev, isOpen: !prev.isOpen };
+      const opening = !prev.isOpen;
+      isOpenRef.current = opening;
+      if (opening) {
+        // Opening: if context changed since last close, open a new tab
+        if (
+          lastClosedContextKeyRef.current !== null &&
+          prev.contextKey !== null &&
+          prev.contextKey !== lastClosedContextKeyRef.current
+        ) {
+          addTab();
+        }
+        focusGhostInput();
+      } else {
+        lastClosedContextKeyRef.current = prev.contextKey;
+      }
+      return { ...prev, isOpen: opening };
     });
-  }, [focusGhostInput]);
+  }, [focusGhostInput, addTab]);
 
   const setIsWorking = useCallback((working: boolean) => {
     setState((prev) => (prev.isWorking === working ? prev : { ...prev, isWorking: working }));
@@ -232,20 +268,21 @@ export function GlobalChatProvider({ children, initialTabState }: GlobalChatProv
     contextHandlerRef.current = fn;
   }, []);
 
-  // Cmd+I / Ctrl+I keyboard shortcut to toggle AI panel
+  // Cmd+I / Ctrl+I to toggle AI panel, Cmd+N to add tab when open
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "i") {
         e.preventDefault();
-        setState((prev) => {
-          if (!prev.isOpen) focusGhostInput();
-          return { ...prev, isOpen: !prev.isOpen };
-        });
+        toggleChat();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "n" && isOpenRef.current) {
+        e.preventDefault();
+        addTab();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [addTab, toggleChat]);
 
   return (
     <GlobalChatContext.Provider
@@ -263,6 +300,7 @@ export function GlobalChatProvider({ children, initialTabState }: GlobalChatProv
         addTab,
         closeTab,
         switchTab,
+        renameTab,
       }}
     >
       {children}

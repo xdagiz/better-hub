@@ -15,22 +15,22 @@ const reviewStateBadge: Record<
   APPROVED: {
     label: "approved",
     className:
-      "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/5",
+      "text-success border-success/20 bg-success/5",
   },
   CHANGES_REQUESTED: {
     label: "changes requested",
     className:
-      "text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/5",
+      "text-warning border-warning/20 bg-warning/5",
   },
   COMMENTED: {
     label: "reviewed",
     className:
-      "text-blue-600 dark:text-blue-400 border-blue-500/20 bg-blue-500/5",
+      "text-info border-info/20 bg-info/5",
   },
   DISMISSED: {
     label: "dismissed",
     className:
-      "text-zinc-500 dark:text-zinc-400 border-zinc-500/20 bg-zinc-500/5",
+      "text-muted-foreground border-muted-foreground/20 bg-muted-foreground/5",
   },
 };
 
@@ -62,13 +62,13 @@ export function CollapsibleReviewCard({
 
   return (
     <div className="group">
-      <div className="border border-zinc-200/60 dark:border-zinc-800/50 rounded-lg overflow-hidden">
+      <div className="border border-border/60 rounded-lg overflow-hidden">
         {/* Review header — clickable to collapse */}
         <button
           onClick={() => hasContent && setExpanded((e) => !e)}
           className={cn(
-            "w-full flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/40 bg-zinc-50/50 dark:bg-zinc-800/20 text-left",
-            hasContent && "cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors"
+            "w-full flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-card/50 text-left",
+            hasContent && "cursor-pointer hover:bg-card/80 transition-colors"
           )}
         >
           {hasContent && (
@@ -96,7 +96,7 @@ export function CollapsibleReviewCard({
             </Link>
           ) : (
             <>
-              <div className="w-4 h-4 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+              <div className="w-4 h-4 rounded-full bg-muted-foreground shrink-0" />
               <span className="text-xs font-medium text-foreground/80">ghost</span>
             </>
           )}
@@ -133,13 +133,13 @@ export function CollapsibleReviewCard({
             <div
               className={cn(
                 bodyContent &&
-                  "border-t border-zinc-200/40 dark:border-zinc-800/30"
+                  "border-t border-border/40"
               )}
             >
               {comments.map((comment) => (
                 <div
                   key={comment.id}
-                  className="px-3 py-2 border-b border-zinc-200/30 dark:border-zinc-800/20 last:border-b-0"
+                  className="px-3 py-2 border-b border-border/30 last:border-b-0"
                 >
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="text-[10px] text-muted-foreground/50 truncate font-mono">

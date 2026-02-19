@@ -39,8 +39,8 @@ export function StarButton({ owner, repo, starred, starCount }: StarButtonProps)
       className={cn(
         "flex items-center justify-center gap-1.5 text-[11px] font-mono py-1.5 border transition-colors cursor-pointer",
         isStarred
-          ? "border-amber-500/30 text-amber-500 hover:bg-amber-500/10 dark:border-amber-400/30 dark:text-amber-400 dark:hover:bg-amber-400/10"
-          : "border-border text-muted-foreground hover:text-foreground hover:border-zinc-300 dark:hover:border-zinc-600",
+          ? "border-warning/30 text-warning hover:bg-warning/10"
+          : "border-border text-muted-foreground hover:text-foreground hover:border-border",
         isPending && "opacity-60 pointer-events-none"
       )}
     >
@@ -50,7 +50,7 @@ export function StarButton({ owner, repo, starred, starCount }: StarButtonProps)
       {isStarred ? "Starred" : "Star"}
       <span className={cn(
         "text-[10px] ml-0.5",
-        isStarred ? "text-amber-500/70 dark:text-amber-400/70" : "text-muted-foreground/60"
+        isStarred ? "text-warning/70" : "text-muted-foreground/60"
       )}>
         {formatNumber(count)}
       </span>

@@ -1,4 +1,4 @@
-import { getIssue, getIssueComments, getAuthenticatedUser, getRepo } from "@/lib/github";
+import { getIssue, getIssueComments, getAuthenticatedUser, getRepo, getLinkedPullRequests } from "@/lib/github";
 import { extractParticipants } from "@/lib/github-utils";
 import { IssueHeader } from "@/components/issue/issue-header";
 import { IssueDetailLayout } from "@/components/issue/issue-detail-layout";
@@ -20,11 +20,12 @@ export default async function IssueDetailPage({
   const { owner, repo, number: numStr } = await params;
   const issueNumber = parseInt(numStr, 10);
 
-  const [issue, comments, currentUser, repoData] = await Promise.all([
+  const [issue, comments, currentUser, repoData, linkedPRs] = await Promise.all([
     getIssue(owner, repo, issueNumber),
     getIssueComments(owner, repo, issueNumber),
     getAuthenticatedUser(),
     getRepo(owner, repo),
+    getLinkedPullRequests(owner, repo, issueNumber),
   ]);
 
   if (!issue) {
@@ -95,7 +96,7 @@ export default async function IssueDetailPage({
     <>
     <TrackView
       type="issue"
-      url={`/repos/${owner}/${repo}/issues/${issueNumber}`}
+      url={`/${owner}/${repo}/issues/${issueNumber}`}
       title={issue.title}
       subtitle={`${owner}/${repo}`}
       number={issueNumber}
@@ -115,6 +116,7 @@ export default async function IssueDetailPage({
           )}
           owner={owner}
           repo={repo}
+          linkedPRs={linkedPRs}
         />
       }
       issueBody={

@@ -3,7 +3,8 @@
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { DefaultChatTransport } from "ai";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, memo } from "react";
+import { HighlightedCodeBlock } from "@/components/shared/highlighted-code-block";
 import { ArrowUp, Square, RotateCcw, Loader2, Check, FileEdit, FilePlus2, FileSearch, GitPullRequest, Search, Star, GitFork, Eye, EyeOff, CirclePlus, CircleX, List, GitMerge, User, UserPlus, UserMinus, Bell, BellOff, Code2, Navigation, ExternalLink, MessageSquare, Tag, GitBranch, Container, Terminal, FileUp, FileDown, GitCommitHorizontal, Power, Play, Ghost, Copy } from "lucide-react";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -58,9 +59,9 @@ function GhostThinkingIndicator({ status }: { status: string }) {
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import Link from "next/link";
 import { toInternalUrl, parseGitHubUrl } from "@/lib/github-utils";
-import { AgentIcon } from "@/components/ui/agent-icon";
 import { useSession } from "@/lib/auth-client";
 import { useGlobalChatOptional } from "@/components/shared/global-chat-provider";
 
@@ -79,8 +80,8 @@ function CopyButton({ text }: { text: string }) {
         "absolute top-1.5 right-1.5 p-1 rounded-md transition-all duration-150 cursor-pointer",
         "opacity-0 group-hover/code:opacity-100",
         copied
-          ? "bg-emerald-500/10 text-emerald-500"
-          : "bg-zinc-200/60 dark:bg-zinc-700/60 text-muted-foreground/60 hover:text-foreground hover:bg-zinc-300/60 dark:hover:bg-zinc-600/60"
+          ? "bg-success/10 text-success"
+          : "bg-accent text-muted-foreground/60 hover:text-foreground hover:bg-accent/80"
       )}
       title="Copy"
     >
@@ -93,7 +94,7 @@ function CopyButton({ text }: { text: string }) {
  *  Rewrites github.com links to internal app routes.
  *  Adds copy button on code blocks and inline code. */
 const ghostMarkdownComponents = {
-  pre: ({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) => {
+  pre: ({ children, node, ...props }: React.HTMLAttributes<HTMLPreElement> & { node?: any }) => {
     // Extract text content from the <code> child
     let codeText = "";
     const child = Array.isArray(children) ? children[0] : children;
@@ -107,6 +108,21 @@ const ghostMarkdownComponents = {
           .join("");
       }
     }
+    // If child code has a language class, HighlightedCodeBlock handles its own wrapper
+    const codeChild = (node?.children as any[])?.find(
+      (c: any) => c.tagName === "code"
+    );
+    const hasLang = codeChild?.properties?.className?.some?.(
+      (c: string) => typeof c === "string" && c.startsWith("language-")
+    );
+    if (hasLang) {
+      return (
+        <div className="relative group/code">
+          {children}
+          {codeText && <CopyButton text={codeText} />}
+        </div>
+      );
+    }
     return (
       <div className="relative group/code">
         <pre {...props}>{children}</pre>
@@ -115,9 +131,15 @@ const ghostMarkdownComponents = {
     );
   },
   code: ({ children, className, ...props }: React.HTMLAttributes<HTMLElement>) => {
-    // If it has a language className, it's inside a <pre> — don't add copy here
-    if (className) {
-      return <code className={className} {...props}>{children}</code>;
+    // Fenced code block with language — use syntax highlighting
+    const match = /language-(\w+)/.exec(className || "");
+    if (match) {
+      return (
+        <HighlightedCodeBlock
+          code={String(children).replace(/\n$/, "")}
+          lang={match[1]}
+        />
+      );
     }
     // Inline code — add copy on hover
     const text = typeof children === "string" ? children : "";
@@ -137,6 +159,17 @@ const ghostMarkdownComponents = {
       </span>
     );
   },
+  table: ({ children, ...props }: React.HTMLAttributes<HTMLTableElement>) => (
+    <div className="overflow-x-auto my-2 rounded border border-border/60">
+      <table className="w-full text-[11px]" {...props}>{children}</table>
+    </div>
+  ),
+  th: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
+    <th className="px-2.5 py-1.5 text-left font-medium text-muted-foreground/70 bg-muted/40 border-b border-border/60" {...props}>{children}</th>
+  ),
+  td: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
+    <td className="px-2.5 py-1.5 border-b border-border/30" {...props}>{children}</td>
+  ),
   a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
     if (href && parseGitHubUrl(href)) {
       const internalPath = toInternalUrl(href);
@@ -193,6 +226,8 @@ interface AIChatProps {
   onFetchFileContent?: (path: string) => Promise<{ filename: string; content: string } | null>;
   /** PR diff files shown in the "PR Files" section of # dropdown */
   hashMentionPrFiles?: MentionableFile[];
+  /** Auto-focus the input on mount */
+  autoFocus?: boolean;
 }
 
 export function AIChat({
@@ -202,8 +237,8 @@ export function AIChat({
   persistKey,
   chatType,
   placeholder = "Ask a question...",
-  emptyTitle = "AI Assistant",
-  emptyDescription = "Ask questions and get help",
+  emptyTitle = "Ghost",
+  emptyDescription = "Your haunted assistant for all things here.",
   suggestions = [],
   inputPrefix,
   onNewChat,
@@ -214,6 +249,7 @@ export function AIChat({
   onSearchRepoFiles,
   onFetchFileContent,
   hashMentionPrFiles,
+  autoFocus,
 }: AIChatProps) {
   const { data: session } = useSession();
   const globalChat = useGlobalChatOptional();
@@ -228,6 +264,13 @@ export function AIChat({
   // Context snapshots per user message (messageId → contexts at send time)
   const [messageContexts, setMessageContexts] = useState<Record<string, AttachedContext[]>>({});
   const pendingContextsRef = useRef<AttachedContext[] | null>(null);
+
+  // Auto-focus input when requested
+  useEffect(() => {
+    if (autoFocus) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [autoFocus]);
 
   // @ mention autocomplete state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -536,6 +579,7 @@ export function AIChat({
     "assignIssue", "unassignIssue",
     "editFile", "createFile", "amendCommit", "createPullRequest",
     "sandboxCommitAndPush", "sandboxCreatePR",
+    "createPromptRequest", "completePromptRequest", "editPromptRequest",
   ]);
 
   useEffect(() => {
@@ -590,25 +634,28 @@ export function AIChat({
                 settings: "/settings",
                 search: "/search",
                 trending: "/trending",
-                collections: "/collections",
                 orgs: "/orgs",
               };
               const page = output.page as string;
               router.push(pageMap[page] ?? "/dashboard");
             } else if (action === "openRepo") {
-              router.push(`/repos/${output.owner}/${output.repo}`);
+              router.push(`/${output.owner}/${output.repo}`);
             } else if (action === "openRepoTab") {
-              router.push(`/repos/${output.owner}/${output.repo}/${output.tab}`);
+              router.push(`/${output.owner}/${output.repo}/${output.tab}`);
             } else if (action === "openWorkflowRun") {
-              router.push(`/repos/${output.owner}/${output.repo}/actions/${output.runId}`);
+              router.push(`/${output.owner}/${output.repo}/actions/${output.runId}`);
             } else if (action === "openCommit") {
-              router.push(`/repos/${output.owner}/${output.repo}/commits/${output.sha}`);
+              router.push(`/${output.owner}/${output.repo}/commits/${output.sha}`);
             } else if (action === "openIssue") {
-              router.push(`/repos/${output.owner}/${output.repo}/issues/${output.issueNumber}`);
+              router.push(`/${output.owner}/${output.repo}/issues/${output.issueNumber}`);
             } else if (action === "openPullRequest") {
-              router.push(`/repos/${output.owner}/${output.repo}/pulls/${output.pullNumber}`);
+              router.push(`/${output.owner}/${output.repo}/pulls/${output.pullNumber}`);
             } else if (action === "openUser") {
               router.push(`/users/${output.username}`);
+            } else if (action === "openPromptRequests") {
+              const url = output.url as string;
+              if (url) router.push(url);
+              else router.push(`/${output.owner}/${output.repo}/prompts`);
             } else if (action === "openUrl") {
               const url = output.url as string;
               if (url) window.open(url, "_blank");
@@ -811,7 +858,7 @@ export function AIChat({
       >
         {messages.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center h-full text-center gap-3">
-            <AgentIcon className="size-6 text-muted-foreground/40" />
+            <Ghost className="size-6 text-muted-foreground/40" />
             <div>
               <p className="text-xs font-medium text-foreground/70 mb-0.5" suppressHydrationWarning>
                 {emptyTitle}
@@ -859,7 +906,7 @@ export function AIChat({
                         <div className="flex items-center gap-1 ml-auto">
                           {messageContexts[message.id].length === 1 ? (
                             <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/60 text-[10px] font-mono text-muted-foreground/60"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/60 text-[10px] font-mono text-muted-foreground/60"
                             >
                               <Code2 className="w-2.5 h-2.5 text-muted-foreground/40 shrink-0" />
                               <span className="truncate max-w-[140px]">
@@ -871,7 +918,7 @@ export function AIChat({
                               </span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/60 text-[10px] font-mono text-muted-foreground/60">
+                            <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-muted/60 text-[10px] font-mono text-muted-foreground/60">
                               <Code2 className="w-2.5 h-2.5 text-muted-foreground/40 shrink-0" />
                               <span className="size-4 rounded-full bg-foreground/10 flex items-center justify-center text-[9px] font-semibold text-muted-foreground/80 tabular-nums">
                                 {messageContexts[message.id].length}
@@ -894,13 +941,15 @@ export function AIChat({
                       if (part.type === "text" && part.text) {
                         return (
                           <div key={i} className="ghmd ghmd-ai">
-                            <ReactMarkdown components={ghostMarkdownComponents}>{part.text}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={ghostMarkdownComponents}>{part.text}</ReactMarkdown>
                           </div>
                         );
                       }
                       if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
                         const p = part as any;
                         const toolName = part.type === "dynamic-tool" ? p.toolName : part.type.replace("tool-", "");
+                        // Hide background tools from UI
+                        if (toolName === "refreshPage") return null;
                         return (
                           <ToolInvocationDisplay
                             key={i}
@@ -927,7 +976,7 @@ export function AIChat({
             {/* Error state — stream died, timed out, etc. */}
             {error && (
               <div className="flex items-center gap-2 py-1.5">
-                <span className="text-[11px] text-red-500/70">
+                <span className="text-[11px] text-destructive/70">
                   Something went wrong.
                 </span>
                 <button
@@ -986,7 +1035,7 @@ export function AIChat({
           className={cn(
             "rounded-xl border transition-all duration-200",
             "border-border/60 dark:border-white/8",
-            "bg-zinc-50/50 dark:bg-white/[0.02]",
+            "bg-card/50 dark:bg-white/[0.02]",
             "focus-within:border-foreground/15 dark:focus-within:border-white/12",
             "focus-within:bg-background dark:focus-within:bg-white/[0.03]",
             "focus-within:shadow-[0_0_0_1px_rgba(0,0,0,0.04)] dark:focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.03)]",
@@ -1014,8 +1063,8 @@ export function AIChat({
                     className={cn(
                       "w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors cursor-pointer",
                       i === mentionIndex
-                        ? "bg-zinc-100 dark:bg-zinc-800/60"
-                        : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+                        ? "bg-muted/60"
+                        : "hover:bg-muted/50"
                     )}
                   >
                     <Code2 className="w-3 h-3 text-muted-foreground/40 shrink-0" />
@@ -1057,8 +1106,8 @@ export function AIChat({
                         className={cn(
                           "w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors cursor-pointer",
                           i === hashIndex
-                            ? "bg-zinc-100 dark:bg-zinc-800/60"
-                            : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+                            ? "bg-muted/60"
+                            : "hover:bg-muted/50"
                         )}
                       >
                         <Code2 className="w-3 h-3 text-muted-foreground/40 shrink-0" />
@@ -1095,8 +1144,8 @@ export function AIChat({
                         className={cn(
                           "w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors cursor-pointer",
                           globalIdx === hashIndex
-                            ? "bg-zinc-100 dark:bg-zinc-800/60"
-                            : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+                            ? "bg-muted/60"
+                            : "hover:bg-muted/50"
                         )}
                       >
                         <Code2 className="w-3 h-3 text-muted-foreground/40 shrink-0" />
@@ -1142,7 +1191,7 @@ export function AIChat({
                 <button
                   type="button"
                   onClick={() => stop()}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all duration-150 cursor-pointer"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 cursor-pointer"
                   title="Stop generating"
                 >
                   <Square className="size-2.5 fill-current" />
@@ -1484,10 +1533,10 @@ export function ToolInvocationDisplay({
       className={cn(
         "flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-mono",
         hasError
-          ? "bg-red-500/[0.06] text-red-500/80"
+          ? "bg-destructive/[0.06] text-destructive/80"
           : hasSuccess
-            ? "bg-emerald-500/[0.06] text-emerald-600 dark:text-emerald-400"
-            : "bg-zinc-100 dark:bg-zinc-800/40 text-muted-foreground/70"
+            ? "bg-success/[0.06] text-success"
+            : "bg-muted/60 text-muted-foreground/70"
       )}
     >
       {isLoading ? (

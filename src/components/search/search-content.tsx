@@ -208,7 +208,7 @@ function CodeFragment({ fragment, matches }: { fragment: string; matches: TextMa
               seg.isMatch ? (
                 <mark
                   key={j}
-                  className="bg-amber-200/60 dark:bg-amber-500/25 text-foreground rounded-sm px-px"
+                  className="bg-warning/25 text-foreground rounded-sm px-px"
                 >
                   {seg.text}
                 </mark>
@@ -233,21 +233,21 @@ function CodeResultItem({ item }: { item: CodeSearchItem }) {
           className="w-4 h-4 rounded-full shrink-0"
         />
         <a
-          href={`/repos/${item.repository.full_name}`}
+          href={`/${item.repository.full_name}`}
           className="text-[12px] font-mono text-foreground hover:underline"
         >
           {item.repository.full_name}
         </a>
         <span className="text-muted-foreground/30 text-[12px]">&rsaquo;</span>
         <a
-          href={`/repos/${item.repository.full_name}/blob/HEAD/${item.path}`}
+          href={`/${item.repository.full_name}/blob/HEAD/${item.path}`}
           className="text-[12px] font-mono text-muted-foreground/70 hover:text-foreground hover:underline truncate"
         >
           {item.path}
         </a>
       </div>
       {item.text_matches && item.text_matches.length > 0 ? (
-        <div className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+        <div className="divide-y divide-border/60">
           {item.text_matches.slice(0, 3).map((tm, j) => (
             <div key={j} className="px-3 py-2 overflow-x-auto">
               <CodeFragment fragment={tm.fragment} matches={tm.matches} />
@@ -266,7 +266,7 @@ function CodeResultItem({ item }: { item: CodeSearchItem }) {
 function RepoResultItem({ item }: { item: RepoSearchItem }) {
   return (
     <a
-      href={`/repos/${item.full_name}`}
+      href={`/${item.full_name}`}
       className="block border border-border rounded-md p-4 hover:bg-muted/30 dark:hover:bg-white/[0.02] transition-colors"
     >
       <div className="flex items-start gap-3">
@@ -319,13 +319,13 @@ function IssueResultItem({ item }: { item: IssueSearchItem }) {
 
   return (
     <a
-      href={`/repos/${repo}/issues/${item.number}`}
+      href={`/${repo}/issues/${item.number}`}
       className="flex items-start gap-3 border border-border rounded-md p-4 hover:bg-muted/30 dark:hover:bg-white/[0.02] transition-colors"
     >
       <CircleDot
         className={cn(
           "w-4 h-4 shrink-0 mt-0.5",
-          isOpen ? "text-green-500" : "text-purple-500"
+          isOpen ? "text-success" : "text-alert-important"
         )}
       />
       <div className="min-w-0 flex-1">
@@ -339,8 +339,8 @@ function IssueResultItem({ item }: { item: IssueSearchItem }) {
             className={cn(
               "text-[10px] font-mono px-1.5 py-0.5 rounded-full border",
               isOpen
-                ? "text-green-600 dark:text-green-400 border-green-500/30 bg-green-500/10"
-                : "text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10"
+                ? "text-success border-success/30 bg-success/10"
+                : "text-alert-important border-alert-important/30 bg-alert-important/10"
             )}
           >
             {isOpen ? "open" : "closed"}
@@ -348,7 +348,7 @@ function IssueResultItem({ item }: { item: IssueSearchItem }) {
           {item.labels.slice(0, 3).map((label) => (
             <span
               key={label.name}
-              className="text-[10px] font-mono px-1.5 py-0.5 rounded-full border border-zinc-200/80 dark:border-zinc-700/80 text-muted-foreground/60"
+              className="text-[10px] font-mono px-1.5 py-0.5 rounded-full border border-border text-muted-foreground/60"
               style={
                 label.color
                   ? {
@@ -379,17 +379,17 @@ function PRResultItem({ item }: { item: IssueSearchItem }) {
 
   return (
     <a
-      href={`/repos/${repo}/pulls/${item.number}`}
+      href={`/${repo}/pulls/${item.number}`}
       className="flex items-start gap-3 border border-border rounded-md p-4 hover:bg-muted/30 dark:hover:bg-white/[0.02] transition-colors"
     >
       <GitPullRequest
         className={cn(
           "w-4 h-4 shrink-0 mt-0.5",
           isMerged
-            ? "text-purple-500"
+            ? "text-alert-important"
             : isOpen
-              ? "text-green-500"
-              : "text-red-500"
+              ? "text-success"
+              : "text-destructive"
         )}
       />
       <div className="min-w-0 flex-1">
@@ -403,10 +403,10 @@ function PRResultItem({ item }: { item: IssueSearchItem }) {
             className={cn(
               "text-[10px] font-mono px-1.5 py-0.5 rounded-full border",
               isMerged
-                ? "text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10"
+                ? "text-alert-important border-alert-important/30 bg-alert-important/10"
                 : isOpen
-                  ? "text-green-600 dark:text-green-400 border-green-500/30 bg-green-500/10"
-                  : "text-red-600 dark:text-red-400 border-red-500/30 bg-red-500/10"
+                  ? "text-success border-success/30 bg-success/10"
+                  : "text-destructive border-destructive/30 bg-destructive/10"
             )}
           >
             {stateLabel}
@@ -414,7 +414,7 @@ function PRResultItem({ item }: { item: IssueSearchItem }) {
           {item.labels.slice(0, 3).map((label) => (
             <span
               key={label.name}
-              className="text-[10px] font-mono px-1.5 py-0.5 rounded-full border border-zinc-200/80 dark:border-zinc-700/80 text-muted-foreground/60"
+              className="text-[10px] font-mono px-1.5 py-0.5 rounded-full border border-border text-muted-foreground/60"
               style={
                 label.color
                   ? {

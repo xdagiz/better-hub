@@ -1,4 +1,4 @@
-import { getOrgMembers, getRepoContributors, getRepoContributorStats } from "@/lib/github";
+import { getRepoContributors, getRepoContributorStats } from "@/lib/github";
 import { PeopleList } from "@/components/people/people-list";
 
 export default async function PeoplePage({
@@ -8,18 +8,10 @@ export default async function PeoplePage({
 }) {
   const { owner, repo } = await params;
 
-  const [members, contributorsData, contributorStats] = await Promise.all([
-    getOrgMembers(owner),
+  const [contributorsData, contributorStats] = await Promise.all([
     getRepoContributors(owner, repo, 100),
     getRepoContributorStats(owner, repo),
   ]);
-
-  const contributionMap: Record<string, number> = {};
-  for (const c of contributorsData.list) {
-    if (c.login) {
-      contributionMap[c.login.toLowerCase()] = c.contributions;
-    }
-  }
 
   // Build weekly commit data + additions/deletions per contributor
   const weeklyMap: Record<string, number[]> = {};
@@ -39,12 +31,12 @@ export default async function PeoplePage({
     }
   }
 
-  const people = (members as any[]).map((m: any) => {
-    const key = m.login?.toLowerCase();
+  const people = contributorsData.list.map((c) => {
+    const key = c.login.toLowerCase();
     return {
-      login: m.login as string,
-      avatar_url: m.avatar_url as string,
-      contributions: contributionMap[key] ?? 0,
+      login: c.login,
+      avatar_url: c.avatar_url,
+      contributions: c.contributions,
       weeklyCommits: weeklyMap[key] ?? [],
       additions: diffMap[key]?.additions ?? 0,
       deletions: diffMap[key]?.deletions ?? 0,

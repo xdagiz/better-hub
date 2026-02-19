@@ -18,10 +18,10 @@ export function PRFilesList({ files }: { files: ChangedFile[] }) {
         <span className="text-[11px] font-mono text-muted-foreground">
           {files.length} file{files.length !== 1 ? "s" : ""} changed
         </span>
-        <span className="text-[11px] font-mono text-emerald-500">
+        <span className="text-[11px] font-mono text-success">
           +{totalAdditions}
         </span>
-        <span className="text-[11px] font-mono text-red-400">
+        <span className="text-[11px] font-mono text-destructive">
           -{totalDeletions}
         </span>
       </div>
@@ -40,16 +40,16 @@ export function PRFilesList({ files }: { files: ChangedFile[] }) {
                 {file.filename}
               </span>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[11px] font-mono text-emerald-500">
+                <span className="text-[11px] font-mono text-success">
                   +{file.additions}
                 </span>
-                <span className="text-[11px] font-mono text-red-400">
+                <span className="text-[11px] font-mono text-destructive">
                   -{file.deletions}
                 </span>
                 {total > 0 && (
-                  <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                  <div className="w-12 h-1.5 bg-muted overflow-hidden">
                     <div
-                      className="h-full bg-emerald-500"
+                      className="h-full bg-success"
                       style={{ width: `${addWidth}%` }}
                     />
                   </div>
@@ -65,18 +65,18 @@ export function PRFilesList({ files }: { files: ChangedFile[] }) {
 
 function StatusDot({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    added: "bg-emerald-500",
-    removed: "bg-red-400",
-    modified: "bg-amber-500",
-    renamed: "bg-blue-400",
-    copied: "bg-blue-400",
+    added: "bg-success",
+    removed: "bg-destructive",
+    modified: "bg-warning",
+    renamed: "bg-info",
+    copied: "bg-info",
   };
 
   return (
     <span
       className={cn(
         "w-1.5 h-1.5 rounded-full shrink-0",
-        colors[status] || "bg-zinc-400"
+        colors[status] || "bg-muted-foreground"
       )}
     />
   );

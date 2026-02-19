@@ -26,12 +26,20 @@ function ensureSchema(db: Database.Database) {
       user_id TEXT PRIMARY KEY,
       display_name TEXT,
       theme TEXT NOT NULL DEFAULT 'system',
+      color_theme TEXT NOT NULL DEFAULT 'midnight',
       ghost_model TEXT NOT NULL DEFAULT 'moonshotai/kimi-k2.5',
       use_own_api_key INTEGER NOT NULL DEFAULT 0,
       openrouter_api_key TEXT,
       updated_at TEXT NOT NULL
     );
   `);
+
+  // Migration: add color_theme column if missing
+  try {
+    db.exec(`ALTER TABLE user_settings ADD COLUMN color_theme TEXT NOT NULL DEFAULT 'midnight'`);
+  } catch {
+    // column already exists
+  }
 
   globalForSettingsDb.__settingsSchemaReady = true;
 }
@@ -42,6 +50,7 @@ export interface UserSettings {
   userId: string;
   displayName: string | null;
   theme: string;
+  colorTheme: string;
   ghostModel: string;
   useOwnApiKey: boolean;
   openrouterApiKey: string | null;
@@ -52,6 +61,7 @@ interface UserSettingsRow {
   user_id: string;
   display_name: string | null;
   theme: string;
+  color_theme: string;
   ghost_model: string;
   use_own_api_key: number;
   openrouter_api_key: string | null;
@@ -63,6 +73,7 @@ function rowToSettings(row: UserSettingsRow): UserSettings {
     userId: row.user_id,
     displayName: row.display_name,
     theme: row.theme,
+    colorTheme: row.color_theme,
     ghostModel: row.ghost_model,
     useOwnApiKey: row.use_own_api_key === 1,
     openrouterApiKey: row.openrouter_api_key,
@@ -92,7 +103,7 @@ export function updateUserSettings(
   updates: Partial<
     Pick<
       UserSettings,
-      "displayName" | "theme" | "ghostModel" | "useOwnApiKey" | "openrouterApiKey"
+      "displayName" | "theme" | "colorTheme" | "ghostModel" | "useOwnApiKey" | "openrouterApiKey"
     >
   >
 ): UserSettings {
@@ -107,6 +118,7 @@ export function updateUserSettings(
   const fieldMap: Record<string, string> = {
     displayName: "display_name",
     theme: "theme",
+    colorTheme: "color_theme",
     ghostModel: "ghost_model",
     useOwnApiKey: "use_own_api_key",
     openrouterApiKey: "openrouter_api_key",

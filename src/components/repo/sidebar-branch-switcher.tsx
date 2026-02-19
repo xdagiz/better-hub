@@ -51,7 +51,7 @@ export function SidebarBranchSwitcher({
   function select(ref: string) {
     setOpen(false);
     setSearch("");
-    router.push(`/repos/${owner}/${repo}/tree/${ref}`);
+    router.push(`/${owner}/${repo}/tree/${ref}`);
   }
 
   return (

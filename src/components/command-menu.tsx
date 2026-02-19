@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import {
   LayoutDashboard,
   FolderGit2,
@@ -13,15 +12,21 @@ import {
   Settings,
   ExternalLink,
   LogOut,
-  Moon,
-  Sun,
   Loader2,
   ChevronRight,
   Ghost,
+  Palette,
+  Check,
+  Moon,
+  Sun,
+  CircleDot,
+  History,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import { cn, formatNumber } from "@/lib/utils";
 import { useGlobalChatOptional } from "@/components/shared/global-chat-provider";
+import { getRecentViews, type RecentViewItem } from "@/lib/recent-views";
+import { useColorTheme } from "@/components/theme/theme-provider";
 
 
 interface SearchRepo {
@@ -56,7 +61,7 @@ const languageColors: Record<string, string> = {
   Shell: "#89e051",
 };
 
-type Mode = "commands" | "search";
+type Mode = "commands" | "search" | "theme";
 
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
@@ -68,8 +73,11 @@ export function CommandMenu() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const { setTheme, resolvedTheme } = useTheme();
   const globalChat = useGlobalChatOptional();
+  const { colorTheme, setColorTheme, themes: colorThemes, mode: _colorMode } = useColorTheme();
+
+  // Recently viewed
+  const [recentViews, setRecentViews] = useState<RecentViewItem[]>([]);
 
   // Repo search state
   const userReposRef = useRef<SearchRepo[]>([]);
@@ -81,6 +89,11 @@ export function CommandMenu() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Load recent views when menu opens
+  useEffect(() => {
+    if (open) setRecentViews(getRecentViews());
+  }, [open]);
 
   // Fetch user repos on first open (cached in ref)
   useEffect(() => {
@@ -101,7 +114,18 @@ export function CommandMenu() {
     return () => { cancelled = true; };
   }, [open, userReposLoaded]);
 
-  // Cmd+K and "/" shortcuts + Escape to close
+  const navigationItems = useMemo(
+    () => [
+      { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, shortcut: "1" },
+      { name: "Repositories", path: "/repos", icon: FolderGit2, shortcut: "2" },
+      { name: "PRs", path: "/prs", icon: GitPullRequest, shortcut: "3" },
+      { name: "Search Code", path: "/search", icon: Search, shortcut: "4" },
+      { name: "Settings", path: "/settings", icon: Settings, shortcut: "5" },
+    ],
+    []
+  );
+
+  // Cmd+K, "/", Escape, and global 1-5 number key shortcuts
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -119,10 +143,20 @@ export function CommandMenu() {
       if (e.key === "Escape" && open) {
         setOpen(false);
       }
+      // Global 1-5 number key navigation (when menu is closed)
+      if (!open && ["1", "2", "3", "4", "5"].includes(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+        const nav = navigationItems.find((n) => n.shortcut === e.key);
+        if (nav) {
+          e.preventDefault();
+          router.push(nav.path);
+        }
+      }
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
-  }, [open]);
+  }, [open, navigationItems, router]);
 
   useEffect(() => {
     if (open) {
@@ -203,16 +237,6 @@ export function CommandMenu() {
     setGithubLoading(false);
   }, []);
 
-  const navigationItems = useMemo(
-    () => [
-      { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, shortcut: "1" },
-      { name: "Repositories", path: "/repos", icon: FolderGit2, shortcut: "2" },
-      { name: "PRs", path: "/prs", icon: GitPullRequest, shortcut: "3" },
-      { name: "Search Code", path: "/search", icon: Search, shortcut: "4" },
-      { name: "Settings", path: "/settings", icon: Settings, shortcut: "5" },
-    ],
-    []
-  );
 
   const tools = useMemo(() => [
     ...(globalChat ? [{
@@ -230,10 +254,11 @@ export function CommandMenu() {
       keepOpen: true,
     },
     {
-      name: resolvedTheme === "dark" ? "Light Mode" : "Dark Mode",
-      description: `Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`,
-      action: () => setTheme(resolvedTheme === "dark" ? "light" : "dark"),
-      icon: resolvedTheme === "dark" ? Sun : Moon,
+      name: "Change Theme",
+      description: "Switch color theme",
+      action: () => switchMode("theme"),
+      icon: Palette,
+      keepOpen: true,
     },
     {
       name: "New Repository",
@@ -253,7 +278,7 @@ export function CommandMenu() {
       action: () => router.push("/starred"),
       icon: Star,
     },
-  ], [resolvedTheme, setTheme, router, switchMode, globalChat]);
+  ], [router, switchMode, globalChat]);
 
   // --- Commands mode items ---
   const filteredTools = useMemo(() => {
@@ -266,10 +291,29 @@ export function CommandMenu() {
     );
   }, [search, tools]);
 
+  const hasQuery = search.trim().length > 0;
+
+  const filteredRecentViews = useMemo(() => {
+    if (hasQuery) {
+      const s = search.toLowerCase();
+      return recentViews.filter(
+        (v) =>
+          v.title.toLowerCase().includes(s) ||
+          v.subtitle.toLowerCase().includes(s) ||
+          (v.number && String(v.number).includes(s))
+      ).slice(0, 5);
+    }
+    return recentViews.slice(0, 5);
+  }, [recentViews, search, hasQuery]);
+
   const commandItems = useMemo(() => {
-    const items: { id: string; type: "tool"; action: () => void; keepOpen?: boolean }[] = [];
+    const items: { id: string; type: "tool" | "recent"; action: () => void; keepOpen?: boolean }[] = [];
     filteredTools.forEach((t) =>
       items.push({ id: `tool-${t.name}`, type: "tool", action: t.action, keepOpen: t.keepOpen })
+    );
+    // Recently viewed
+    filteredRecentViews.forEach((v) =>
+      items.push({ id: `recent-${v.url}`, type: "recent", action: () => router.push(v.url) })
     );
     // Sign out
     items.push({
@@ -283,7 +327,7 @@ export function CommandMenu() {
         }),
     });
     return items;
-  }, [filteredTools]);
+  }, [filteredTools, filteredRecentViews, router]);
 
   // --- Search mode items ---
   const filteredUserRepos = useMemo(() => {
@@ -314,28 +358,47 @@ export function CommandMenu() {
       topUserRepos.forEach((r) =>
         items.push({
           id: `top-repo-${r.id}`,
-          action: () => router.push(`/repos/${r.full_name}`),
+          action: () => router.push(`/${r.full_name}`),
         })
       );
     } else {
       filteredUserRepos.forEach((r) =>
         items.push({
           id: `user-repo-${r.id}`,
-          action: () => router.push(`/repos/${r.full_name}`),
+          action: () => router.push(`/${r.full_name}`),
         })
       );
       dedupedGithubResults.forEach((r) =>
         items.push({
           id: `gh-repo-${r.id}`,
-          action: () => router.push(`/repos/${r.full_name}`),
+          action: () => router.push(`/${r.full_name}`),
         })
       );
     }
     return items;
   }, [search, topUserRepos, filteredUserRepos, dedupedGithubResults, router]);
 
-  const allItems = mode === "commands" ? commandItems : searchItems;
-  const hasQuery = search.trim().length > 0;
+  // --- Theme mode items ---
+  const filteredThemes = useMemo(() => {
+    if (mode !== "theme") return colorThemes;
+    if (!search.trim()) return colorThemes;
+    const s = search.toLowerCase();
+    return colorThemes.filter(
+      (t) =>
+        t.name.toLowerCase().includes(s) ||
+        t.description.toLowerCase().includes(s)
+    );
+  }, [mode, search, colorThemes]);
+
+  const themeItems = useMemo(() => {
+    return filteredThemes.map((t) => ({
+      id: `theme-${t.id}`,
+      action: () => setColorTheme(t.id),
+      keepOpen: true,
+    }));
+  }, [filteredThemes, setColorTheme]);
+
+  const allItems = mode === "commands" ? commandItems : mode === "search" ? searchItems : themeItems;
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -354,10 +417,11 @@ export function CommandMenu() {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Tab cycles modes: commands <-> search
+      // Tab cycles modes: commands → search → theme → commands
       if (e.key === "Tab") {
         e.preventDefault();
         if (mode === "commands") switchMode("search");
+        else if (mode === "search") switchMode("theme");
         else switchMode("commands");
         return;
       }
@@ -369,8 +433,8 @@ export function CommandMenu() {
         return;
       }
 
-      // Backspace on empty in search mode goes back to commands
-      if (e.key === "Backspace" && mode === "search" && !search) {
+      // Backspace on empty in search/theme mode goes back to commands
+      if (e.key === "Backspace" && (mode === "search" || mode === "theme") && !search) {
         e.preventDefault();
         switchMode("commands");
         return;
@@ -417,19 +481,11 @@ export function CommandMenu() {
   let currentItemIndex = -1;
   const getNextIndex = () => ++currentItemIndex;
 
-  if (!mounted) return (
-    <button
-      onClick={() => setOpen(true)}
-      className="hidden md:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md bg-muted/30 hover:bg-muted/50"
-    >
-      <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-        <span className="text-xs">&#x2318;</span>K
-      </kbd>
-    </button>
-  );
+  if (!mounted) return null;
 
   return (
     <>
+      {/* Navbar trigger */}
       <button
         onClick={() => setOpen(true)}
         className="hidden md:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md bg-muted/30 hover:bg-muted/50"
@@ -457,7 +513,7 @@ export function CommandMenu() {
             aria-label="Command Menu"
             className={cn(
               "fixed z-50 left-1/2 -translate-x-1/2 w-full rounded-lg border shadow-lg overflow-hidden",
-              "border-border/60 dark:border-white/6 bg-white dark:bg-zinc-950",
+              "border-border/60 dark:border-white/6 bg-background",
               "transition-all duration-150",
               open
                 ? "opacity-100 scale-100 translate-y-0"
@@ -473,6 +529,8 @@ export function CommandMenu() {
                 <div className="flex items-center border-b border-border dark:border-white/6 px-3 gap-2">
                   {mode === "search" ? (
                     <Search className="size-4 text-muted-foreground/50 shrink-0" />
+                  ) : mode === "theme" ? (
+                    <Palette className="size-4 text-muted-foreground/50 shrink-0" />
                   ) : (
                     <Search className="size-4 text-muted-foreground/30 shrink-0" />
                   )}
@@ -484,6 +542,8 @@ export function CommandMenu() {
                     placeholder={
                       mode === "search"
                         ? "Search repos and content..."
+                        : mode === "theme"
+                        ? "Search themes..."
                         : "Type a command..."
                     }
                     className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground/40 py-3 text-sm outline-none"
@@ -533,6 +593,36 @@ export function CommandMenu() {
                         </CommandGroup>
                       )}
 
+                      {/* Recently viewed */}
+                      {filteredRecentViews.length > 0 && (
+                        <CommandGroup title="Recently viewed">
+                          {filteredRecentViews.map((item) => {
+                            const idx = getNextIndex();
+                            return (
+                              <CommandItemButton
+                                key={item.url}
+                                index={idx}
+                                selected={selectedIndex === idx}
+                                onClick={() => runCommand(() => router.push(item.url))}
+                              >
+                                {item.type === "pr" ? (
+                                  <GitPullRequest className={cn("size-3.5 shrink-0", item.state === "merged" ? "text-alert-important" : item.state === "open" ? "text-success" : "text-muted-foreground/50")} />
+                                ) : item.type === "issue" ? (
+                                  <CircleDot className={cn("size-3.5 shrink-0", item.state === "open" ? "text-success" : "text-muted-foreground/50")} />
+                                ) : (
+                                  <History className="size-3.5 text-muted-foreground/50 shrink-0" />
+                                )}
+                                <span className="text-[13px] text-foreground flex-1 truncate">
+                                  {item.title}
+                                  {item.number && <span className="text-muted-foreground/50 ml-1">#{item.number}</span>}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground/40 hidden sm:block truncate max-w-[160px]">{item.subtitle}</span>
+                              </CommandItemButton>
+                            );
+                          })}
+                        </CommandGroup>
+                      )}
+
                       {/* Account group */}
                       {!hasQuery && (
                         <CommandGroup title="Account">
@@ -561,13 +651,13 @@ export function CommandMenu() {
                       )}
 
                       {/* No results */}
-                      {hasQuery && filteredTools.length === 0 && (
+                      {hasQuery && filteredTools.length === 0 && filteredRecentViews.length === 0 && (
                         <div className="py-8 text-center text-sm text-muted-foreground/70">
                           No commands match &quot;{search}&quot;
                         </div>
                       )}
                     </>
-                  ) : (
+                  ) : mode === "search" ? (
                     /* Search mode */
                     <>
                       {/* Recent / your repos (when no query) */}
@@ -581,7 +671,7 @@ export function CommandMenu() {
                                 repo={repo}
                                 index={idx}
                                 selected={selectedIndex === idx}
-                                onClick={() => runCommand(() => router.push(`/repos/${repo.full_name}`))}
+                                onClick={() => runCommand(() => router.push(`/${repo.full_name}`))}
                               />
                             );
                           })}
@@ -599,7 +689,7 @@ export function CommandMenu() {
                                 repo={repo}
                                 index={idx}
                                 selected={selectedIndex === idx}
-                                onClick={() => runCommand(() => router.push(`/repos/${repo.full_name}`))}
+                                onClick={() => runCommand(() => router.push(`/${repo.full_name}`))}
                               />
                             );
                           })}
@@ -617,7 +707,7 @@ export function CommandMenu() {
                                 repo={repo}
                                 index={idx}
                                 selected={selectedIndex === idx}
-                                onClick={() => runCommand(() => router.push(`/repos/${repo.full_name}`))}
+                                onClick={() => runCommand(() => router.push(`/${repo.full_name}`))}
                               />
                             );
                           })}
@@ -641,6 +731,48 @@ export function CommandMenu() {
                       {!hasQuery && topUserRepos.length === 0 && (
                         <div className="py-8 text-center text-sm text-muted-foreground/40">
                           Start typing to search repositories
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Theme mode */
+                    <>
+                      <CommandGroup title="Color Themes">
+                        {filteredThemes.map((theme) => {
+                          const idx = getNextIndex();
+                          const isActive = colorTheme === theme.id;
+                          return (
+                            <CommandItemButton
+                              key={theme.id}
+                              index={idx}
+                              selected={selectedIndex === idx}
+                              onClick={() => setColorTheme(theme.id)}
+                            >
+                              <span className="flex items-center gap-1 shrink-0">
+                                <span
+                                  className="w-3 h-3 rounded-full border border-border/40"
+                                  style={{ backgroundColor: theme.bgPreview }}
+                                />
+                                <span
+                                  className="w-3 h-3 rounded-full border border-border/40"
+                                  style={{ backgroundColor: theme.accentPreview }}
+                                />
+                              </span>
+                              <span className="text-[13px] text-foreground flex-1">{theme.name}</span>
+                              <span className="text-[11px] text-muted-foreground/40 hidden sm:block">
+                                {theme.mode === "dark" ? <Moon className="inline size-2.5 mr-1" /> : <Sun className="inline size-2.5 mr-1" />}
+                                {theme.description}
+                              </span>
+                              {isActive && (
+                                <Check className="size-3.5 text-success shrink-0" />
+                              )}
+                            </CommandItemButton>
+                          );
+                        })}
+                      </CommandGroup>
+                      {hasQuery && filteredThemes.length === 0 && (
+                        <div className="py-8 text-center text-sm text-muted-foreground/70">
+                          No themes match &quot;{search}&quot;
                         </div>
                       )}
                     </>
@@ -669,7 +801,7 @@ export function CommandMenu() {
                       <span className="inline-flex h-4.5 items-center rounded-sm border border-border/60 dark:border-white/8 bg-muted/50 dark:bg-white/3 px-1 font-mono text-[9px]">
                         &#x232B;
                       </span>
-                      <span>Back</span>
+                      <span>Back{mode === "theme" ? " to commands" : ""}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground/30">
@@ -681,6 +813,16 @@ export function CommandMenu() {
                 </div>
               </>
           </div>
+
+          {/* Floating Ghost button */}
+          {globalChat && (
+            <FloatingGhostTrigger
+              isOpen={globalChat.state.isOpen}
+              isWorking={globalChat.state.isWorking}
+              hidden={open || globalChat.state.isOpen}
+              onClick={globalChat.toggleChat}
+            />
+          )}
         </>,
         document.body
       )}
@@ -786,6 +928,117 @@ function CommandItemButton({
       )}
     >
       {children}
+    </button>
+  );
+}
+
+function FloatingGhostTrigger({
+  isOpen,
+  isWorking,
+  hidden,
+  onClick,
+}: {
+  isOpen: boolean;
+  isWorking: boolean;
+  hidden: boolean;
+  onClick: () => void;
+}) {
+  const [shimmer, setShimmer] = useState(false);
+
+  useEffect(() => {
+    if (isOpen || isWorking) return;
+    const interval = setInterval(() => {
+      setShimmer(true);
+      setTimeout(() => setShimmer(false), 1200);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [isOpen, isWorking]);
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "fixed bottom-5 right-5 z-40 inline-flex items-center justify-center w-9 h-9 rounded-full border border-border/60 dark:border-white/8 bg-background/80 backdrop-blur-xl shadow-lg shadow-black/[0.06] dark:shadow-black/30 text-muted-foreground/60 hover:text-foreground transition-all duration-200 cursor-pointer overflow-hidden",
+        hidden && "opacity-0 pointer-events-none"
+      )}
+      title="Ghost (⌘I)"
+    >
+      <div className="relative w-4 h-4">
+        <Ghost
+          className={cn(
+            "w-4 h-4 absolute inset-0 transition-opacity duration-300",
+            isWorking ? "opacity-30" : "opacity-100"
+          )}
+          strokeWidth={2}
+        />
+        {/* Idle shimmer */}
+        {shimmer && !isWorking && (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            className="absolute inset-0 pointer-events-none"
+          >
+            <defs>
+              <clipPath id="floating-ghost-clip">
+                <path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z" />
+              </clipPath>
+              <linearGradient id="floating-ghost-grad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="currentColor" stopOpacity="0" />
+                <stop offset="42%" stopColor="currentColor" stopOpacity="0" />
+                <stop offset="50%" stopColor="currentColor" stopOpacity="0.4" />
+                <stop offset="58%" stopColor="currentColor" stopOpacity="0" />
+                <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <g clipPath="url(#floating-ghost-clip)">
+              <rect
+                x="0"
+                y="0"
+                width="24"
+                height="24"
+                fill="url(#floating-ghost-grad)"
+                className="ghost-shimmer"
+              />
+            </g>
+          </svg>
+        )}
+        {/* Working fill animation */}
+        {isWorking && (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            className="absolute inset-0"
+          >
+            <defs>
+              <clipPath id="floating-ghost-fill-clip">
+                <path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z" />
+              </clipPath>
+            </defs>
+            <g clipPath="url(#floating-ghost-fill-clip)">
+              <rect
+                x="0"
+                y="0"
+                width="24"
+                height="24"
+                className="fill-foreground ghost-fill-animation"
+              />
+            </g>
+            <path
+              d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-foreground"
+            />
+          </svg>
+        )}
+      </div>
     </button>
   );
 }

@@ -23,6 +23,46 @@ interface SearchMatch {
   lineIdx: number;
 }
 
+function clearTextHighlights(container: Element) {
+  const marks = container.querySelectorAll("mark.search-text-match");
+  marks.forEach((mark) => {
+    const parent = mark.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(mark.textContent || ""), mark);
+      parent.normalize();
+    }
+  });
+}
+
+function highlightTextInLine(lineEl: Element, query: string, caseSensitive: boolean) {
+  const walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
+
+  const q = caseSensitive ? query : query.toLowerCase();
+
+  for (const node of textNodes) {
+    const text = node.textContent || "";
+    const search = caseSensitive ? text : text.toLowerCase();
+    let idx = search.indexOf(q);
+    if (idx === -1) continue;
+
+    const frag = document.createDocumentFragment();
+    let last = 0;
+    while (idx !== -1) {
+      if (idx > last) frag.appendChild(document.createTextNode(text.slice(last, idx)));
+      const mark = document.createElement("mark");
+      mark.className = "search-text-match";
+      mark.textContent = text.slice(idx, idx + q.length);
+      frag.appendChild(mark);
+      last = idx + q.length;
+      idx = search.indexOf(q, last);
+    }
+    if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+    node.parentNode?.replaceChild(frag, node);
+  }
+}
+
 function parseLineHash(hash: string): { start: number; end: number } | null {
   const match = hash.match(/^#L(\d+)(?:-L(\d+))?$/);
   if (!match) return null;
@@ -235,11 +275,14 @@ export function CodeViewerClient({
     setCurrentMatchIdx(found.length > 0 ? 0 : -1);
   }, [searchQuery, matchCase, searchOpen, content]);
 
-  // --- Search: apply highlight classes to matching lines ---
+  // --- Search: apply highlight classes + inline text marks ---
   useEffect(() => {
     if (!codeRef.current) return;
-    const allLineEls = codeRef.current.querySelectorAll(".code-content .line");
+    const container = codeRef.current;
+    const allLineEls = container.querySelectorAll(".code-content .line");
 
+    // Clear previous
+    clearTextHighlights(container);
     allLineEls.forEach((el) => {
       el.classList.remove("search-match", "search-match-active");
     });
@@ -248,7 +291,10 @@ export function CodeViewerClient({
 
     const matchedLines = new Set(matches.map((m) => m.lineIdx));
     for (const lineIdx of matchedLines) {
-      allLineEls[lineIdx]?.classList.add("search-match");
+      if (allLineEls[lineIdx]) {
+        allLineEls[lineIdx].classList.add("search-match");
+        highlightTextInLine(allLineEls[lineIdx], searchQuery, matchCase);
+      }
     }
 
     const activeLineIdx = matches[currentMatchIdx]?.lineIdx;
@@ -257,7 +303,7 @@ export function CodeViewerClient({
       allLineEls[activeLineIdx].classList.add("search-match-active");
       allLineEls[activeLineIdx].scrollIntoView({ block: "center", behavior: "smooth" });
     }
-  }, [matches, currentMatchIdx]);
+  }, [matches, currentMatchIdx, searchQuery, matchCase]);
 
   // --- Search: intercept Cmd+F when hovering ---
   useEffect(() => {
@@ -279,6 +325,7 @@ export function CodeViewerClient({
     setMatches([]);
     setCurrentMatchIdx(-1);
     if (codeRef.current) {
+      clearTextHighlights(codeRef.current);
       codeRef.current.querySelectorAll(".code-content .line").forEach((el) => {
         el.classList.remove("search-match", "search-match-active");
       });

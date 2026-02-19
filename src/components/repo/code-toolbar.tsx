@@ -133,7 +133,7 @@ export function CodeToolbar({
                         >
                           {deletingBranch === branch.name ? (
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <span className="text-xs font-mono text-red-400 shrink-0">
+                              <span className="text-xs font-mono text-destructive shrink-0">
                                 Delete?
                               </span>
                               <div className="ml-auto flex items-center gap-1">
@@ -141,7 +141,7 @@ export function CodeToolbar({
                                   onClick={() =>
                                     handleDeleteBranch(branch.name)
                                   }
-                                  className="p-0.5 rounded text-red-400 hover:text-red-300 hover:bg-red-500/10 cursor-pointer transition-colors"
+                                  className="p-0.5 rounded text-destructive hover:text-destructive/80 hover:bg-destructive/10 cursor-pointer transition-colors"
                                 >
                                   <Check className="w-3.5 h-3.5" />
                                 </button>
@@ -172,10 +172,10 @@ export function CodeToolbar({
                                   <span
                                     className={`w-2 h-2 rounded-full ${
                                       branch.pr.state === "open"
-                                        ? "bg-emerald-500"
+                                        ? "bg-success"
                                         : branch.pr.state === "merged"
-                                          ? "bg-purple-500"
-                                          : "bg-zinc-400"
+                                          ? "bg-alert-important"
+                                          : "bg-muted-foreground"
                                     }`}
                                   />
                                 </span>
@@ -191,7 +191,7 @@ export function CodeToolbar({
                                     onClick={() =>
                                       setDeletingBranch(branch.name)
                                     }
-                                    className="shrink-0 p-0.5 rounded text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-all"
+                                    className="shrink-0 p-0.5 rounded text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-all"
                                   >
                                     <Trash2 className="w-3 h-3" />
                                   </button>
@@ -254,7 +254,7 @@ export function CodeToolbar({
                   className="shrink-0 px-2.5 py-2 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 >
                   {copied ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <Check className="w-3.5 h-3.5 text-success" />
                   ) : (
                     <Copy className="w-3.5 h-3.5" />
                   )}

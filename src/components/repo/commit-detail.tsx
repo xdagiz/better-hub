@@ -93,14 +93,14 @@ function getFileIcon(status: string) {
 function getFileIconColor(status: string) {
   switch (status) {
     case "added":
-      return "text-emerald-500";
+      return "text-success";
     case "removed":
-      return "text-red-400";
+      return "text-destructive";
     case "modified":
-      return "text-amber-500";
+      return "text-warning";
     case "renamed":
     case "copied":
-      return "text-blue-400";
+      return "text-info";
     default:
       return "text-muted-foreground/60";
   }
@@ -209,7 +209,7 @@ export function CommitDetail({
           {/* SHA */}
           <button
             onClick={copySha}
-            className="flex items-center gap-1 font-mono text-[11px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+            className="flex items-center gap-1 font-mono text-[11px] text-info hover:underline cursor-pointer"
           >
             {copiedSha ? (
               <Check className="w-3 h-3" />
@@ -229,8 +229,8 @@ export function CommitDetail({
               {commit.parents.map((p) => (
                 <Link
                   key={p.sha}
-                  href={`/repos/${owner}/${repo}/commits/${p.sha}`}
-                  className="font-mono text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
+                  href={`/${owner}/${repo}/commits/${p.sha}`}
+                  className="font-mono text-[11px] text-info hover:underline"
                 >
                   {p.sha.slice(0, 7)}
                 </Link>
@@ -244,10 +244,10 @@ export function CommitDetail({
           <span className="font-mono text-[11px]">
             {files.length} file{files.length !== 1 ? "s" : ""}
           </span>
-          <span className="font-mono text-[11px] text-emerald-500">
+          <span className="font-mono text-[11px] text-success">
             +{totalAdditions}
           </span>
-          <span className="font-mono text-[11px] text-red-400">
+          <span className="font-mono text-[11px] text-destructive">
             -{totalDeletions}
           </span>
         </div>
@@ -267,10 +267,10 @@ export function CommitDetail({
             <span className="text-[11px] font-mono text-foreground font-medium">
               {files.length} file{files.length !== 1 ? "s" : ""}
             </span>
-            <span className="text-[10px] font-mono text-emerald-500">
+            <span className="text-[10px] font-mono text-success">
               +{totalAdditions}
             </span>
-            <span className="text-[10px] font-mono text-red-400">
+            <span className="text-[10px] font-mono text-destructive">
               -{totalDeletions}
             </span>
           </div>
@@ -290,8 +290,8 @@ export function CommitDetail({
                   className={cn(
                     "w-full flex items-center gap-1.5 px-3 py-1 text-left transition-colors cursor-pointer",
                     activeIndex === i
-                      ? "bg-zinc-100/80 dark:bg-zinc-800/40"
-                      : "hover:bg-zinc-50/80 dark:hover:bg-zinc-800/20"
+                      ? "bg-muted/60"
+                      : "hover:bg-muted/50"
                   )}
                 >
                   <Icon className={cn("w-3 h-3 shrink-0", getFileIconColor(file.status))} />
@@ -312,12 +312,12 @@ export function CommitDetail({
                   )}
                   <div className="flex items-center gap-1 shrink-0 ml-auto">
                     {file.additions > 0 && (
-                      <span className="text-[10px] font-mono text-emerald-500">
+                      <span className="text-[10px] font-mono text-success">
                         +{file.additions}
                       </span>
                     )}
                     {file.deletions > 0 && (
-                      <span className="text-[10px] font-mono text-red-400">
+                      <span className="text-[10px] font-mono text-destructive">
                         -{file.deletions}
                       </span>
                     )}
@@ -395,7 +395,7 @@ function FileHeader({
   const Icon = getFileIcon(file.status);
 
   return (
-    <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/30">
+    <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-border bg-card/50">
       <Icon className={cn("w-3.5 h-3.5 shrink-0", getFileIconColor(file.status))} />
       <span className="text-[12px] font-mono text-foreground truncate">
         {file.filename}
@@ -407,10 +407,10 @@ function FileHeader({
       )}
 
       <div className="flex items-center gap-1 ml-auto shrink-0">
-        <span className="text-[10px] font-mono text-emerald-500">
+        <span className="text-[10px] font-mono text-success">
           +{file.additions}
         </span>
-        <span className="text-[10px] font-mono text-red-400">
+        <span className="text-[10px] font-mono text-destructive">
           -{file.deletions}
         </span>
 
@@ -420,7 +420,7 @@ function FileHeader({
           className={cn(
             "p-1 rounded transition-colors cursor-pointer",
             wordWrap
-              ? "text-foreground/60 bg-zinc-200/50 dark:bg-zinc-700/40"
+              ? "text-foreground/60 bg-accent"
               : "text-muted-foreground/40 hover:text-foreground/60"
           )}
         >
@@ -519,13 +519,13 @@ function CommitDiffLineRow({
     return (
       <tr className="diff-hunk-header">
         <td className="w-[3px] p-0 sticky left-0 z-[1]" />
-        <td className="w-10 py-1.5 pr-2 text-right text-[11px] font-mono text-blue-400/40 select-none bg-blue-500/[0.04] dark:bg-blue-500/[0.06] border-r border-zinc-200/60 dark:border-zinc-800/60 sticky left-[3px] z-[1]">
+        <td className="w-10 py-1.5 pr-2 text-right text-[11px] font-mono text-info/40 select-none bg-info/[0.04] dark:bg-info/[0.06] border-r border-border/60 sticky left-[3px] z-[1]">
           ...
         </td>
-        <td className="w-10 py-1.5 pr-2 text-right text-[11px] font-mono text-blue-400/40 select-none bg-blue-500/[0.04] dark:bg-blue-500/[0.06] border-r border-zinc-200/60 dark:border-zinc-800/60">
+        <td className="w-10 py-1.5 pr-2 text-right text-[11px] font-mono text-info/40 select-none bg-info/[0.04] dark:bg-info/[0.06] border-r border-border/60">
         </td>
-        <td className="py-1.5 px-3 text-[11px] font-mono bg-blue-500/[0.04] dark:bg-blue-500/[0.06]">
-          <span className="text-blue-400/60 dark:text-blue-400/50">
+        <td className="py-1.5 px-3 text-[11px] font-mono bg-info/[0.04] dark:bg-info/[0.06]">
+          <span className="text-info/60 dark:text-info/50">
             {line.content.match(/@@ .+? @@/)?.[0]}
           </span>
           {funcName && (
@@ -552,9 +552,9 @@ function CommitDiffLineRow({
         className={cn(
           "w-[3px] p-0 sticky left-0 z-[1]",
           isAdd
-            ? "bg-emerald-500"
+            ? "bg-success"
             : isDel
-              ? "bg-red-400"
+              ? "bg-destructive"
               : ""
         )}
       />
@@ -562,11 +562,11 @@ function CommitDiffLineRow({
       {/* Old line number */}
       <td
         className={cn(
-          "w-10 py-0 pr-2 text-right text-[11px] font-mono select-none border-r border-zinc-200/40 dark:border-zinc-800/40 sticky left-[3px] z-[1]",
+          "w-10 py-0 pr-2 text-right text-[11px] font-mono select-none border-r border-border/40 sticky left-[3px] z-[1]",
           isAdd
-            ? "bg-emerald-500/[0.08] dark:bg-emerald-400/[0.08] text-emerald-600/40 dark:text-emerald-400/30"
+            ? "bg-diff-add-gutter text-diff-add-gutter"
             : isDel
-              ? "bg-red-500/[0.10] dark:bg-red-400/[0.10] text-red-500/40 dark:text-red-400/30"
+              ? "bg-diff-del-gutter text-diff-del-gutter"
               : "text-muted-foreground/30"
         )}
       >
@@ -576,11 +576,11 @@ function CommitDiffLineRow({
       {/* New line number */}
       <td
         className={cn(
-          "w-10 py-0 pr-2 text-right text-[11px] font-mono select-none border-r border-zinc-200/40 dark:border-zinc-800/40",
+          "w-10 py-0 pr-2 text-right text-[11px] font-mono select-none border-r border-border/40",
           isAdd
-            ? "bg-emerald-500/[0.08] dark:bg-emerald-400/[0.08] text-emerald-600/40 dark:text-emerald-400/30"
+            ? "bg-diff-add-gutter text-diff-add-gutter"
             : isDel
-              ? "bg-red-500/[0.10] dark:bg-red-400/[0.10] text-red-500/40 dark:text-red-400/30"
+              ? "bg-diff-del-gutter text-diff-del-gutter"
               : "text-muted-foreground/30"
         )}
       >
@@ -592,8 +592,8 @@ function CommitDiffLineRow({
         className={cn(
           "py-0 font-mono text-[12.5px] leading-[20px]",
           wordWrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",
-          isAdd && "bg-emerald-500/[0.10] dark:bg-emerald-400/[0.09]",
-          isDel && "bg-red-500/[0.13] dark:bg-red-400/[0.11]"
+          isAdd && "bg-diff-add-bg",
+          isDel && "bg-diff-del-bg"
         )}
       >
         <div className="flex">
@@ -601,9 +601,9 @@ function CommitDiffLineRow({
             className={cn(
               "inline-block w-5 text-center shrink-0 select-none",
               isAdd
-                ? "text-emerald-500/50"
+                ? "text-success/50"
                 : isDel
-                  ? "text-red-400/50"
+                  ? "text-destructive/50"
                   : "text-transparent"
             )}
           >
@@ -627,8 +627,8 @@ function CommitDiffLineRow({
             ) : (
               <span
                 className={cn(
-                  isAdd && "text-emerald-700 dark:text-emerald-300",
-                  isDel && "text-red-600 dark:text-red-300"
+                  isAdd && "text-diff-add-text",
+                  isDel && "text-diff-del-text"
                 )}
               >
                 {line.content}
@@ -654,14 +654,14 @@ function SegmentedContent({
         <span
           key={i}
           className={cn(
-            type === "add" && "text-emerald-700 dark:text-emerald-300",
-            type === "remove" && "text-red-600 dark:text-red-300",
+            type === "add" && "text-diff-add-text",
+            type === "remove" && "text-diff-del-text",
             seg.highlight &&
               type === "add" &&
-              "bg-emerald-500/25 dark:bg-emerald-400/20 rounded-[2px] px-[1px] -mx-[1px]",
+              "bg-diff-word-add rounded-[2px] px-[1px] -mx-[1px]",
             seg.highlight &&
               type === "remove" &&
-              "bg-red-500/25 dark:bg-red-400/20 rounded-[2px] px-[1px] -mx-[1px]"
+              "bg-diff-word-del rounded-[2px] px-[1px] -mx-[1px]"
           )}
         >
           {seg.text}
@@ -727,10 +727,10 @@ function SyntaxSegmentedContent({
           className={cn(
             r.highlight &&
               type === "add" &&
-              "bg-emerald-500/25 dark:bg-emerald-400/20 rounded-[2px] px-[1px] -mx-[1px]",
+              "bg-diff-word-add rounded-[2px] px-[1px] -mx-[1px]",
             r.highlight &&
               type === "remove" &&
-              "bg-red-500/25 dark:bg-red-400/20 rounded-[2px] px-[1px] -mx-[1px]"
+              "bg-diff-word-del rounded-[2px] px-[1px] -mx-[1px]"
           )}
           style={{ "--shiki-light": r.lightColor, "--shiki-dark": r.darkColor } as React.CSSProperties}
         >

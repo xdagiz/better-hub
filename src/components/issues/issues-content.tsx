@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   CircleDot,
   MessageSquare,
   Clock,
   User,
+  Search,
+  ArrowUpDown,
+  UserCheck,
+  PenLine,
+  AtSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toInternalUrl } from "@/lib/github-utils";
@@ -28,6 +33,15 @@ interface IssueItem {
 }
 
 type TabType = "assigned" | "created" | "mentioned";
+type SortType = "updated" | "newest" | "oldest";
+
+const sortLabels: Record<SortType, string> = {
+  updated: "Updated",
+  newest: "Newest",
+  oldest: "Oldest",
+};
+
+const sortCycle: SortType[] = ["updated", "newest", "oldest"];
 
 function extractRepoName(url: string) {
   const parts = url.split("/");
@@ -46,132 +60,185 @@ export function IssuesContent({
   username: string;
 }) {
   const [tab, setTab] = useState<TabType>("assigned");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortType>("updated");
 
-  const tabs: { key: TabType; label: string; count: number; num: string }[] = [
-    { key: "assigned", label: "Assigned", count: assigned.total_count, num: "01" },
-    { key: "created", label: "Created", count: created.total_count, num: "02" },
-    { key: "mentioned", label: "Mentioned", count: mentioned.total_count, num: "03" },
+  const tabItems: { key: TabType; label: string; icon: React.ReactNode; count: number }[] = [
+    { key: "assigned", label: "Assigned", icon: <UserCheck className="w-3 h-3" />, count: assigned.total_count },
+    { key: "created", label: "Created", icon: <PenLine className="w-3 h-3" />, count: created.total_count },
+    { key: "mentioned", label: "Mentioned", icon: <AtSign className="w-3 h-3" />, count: mentioned.total_count },
   ];
 
-  const items = {
+  const rawItems = {
     assigned: assigned.items,
     created: created.items,
     mentioned: mentioned.items,
   }[tab];
 
-  return (
-    <div className="py-4 md:py-6 max-w-[1100px] mx-auto">
-      <div className="mb-6">
-        <h1 className="text-lg font-medium tracking-tight">Issues</h1>
-        <p className="text-xs text-muted-foreground font-mono mt-1">
-          All issues relevant to you across GitHub.
-        </p>
-      </div>
+  const filtered = useMemo(() => {
+    let list = rawItems;
 
-      {/* Tabs */}
-      <div className="flex items-center gap-0 border-b border-border mb-6">
-        {tabs.map((t) => (
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (issue) =>
+          issue.title.toLowerCase().includes(q) ||
+          issue.user?.login.toLowerCase().includes(q) ||
+          extractRepoName(issue.repository_url).toLowerCase().includes(q)
+      );
+    }
+
+    return [...list].sort((a, b) => {
+      switch (sort) {
+        case "newest":
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case "oldest":
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        default: // updated
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      }
+    });
+  }, [rawItems, search, sort]);
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div className="sticky top-0 z-10 bg-background pb-3 pt-4 before:content-[''] before:absolute before:left-0 before:right-0 before:bottom-full before:h-8 before:bg-background">
+        {/* Row 1: Search + Sort */}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40" />
+            <input
+              type="text"
+              placeholder="Search issues..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-8 bg-transparent border border-border rounded-lg pl-9 pr-4 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-foreground/20 transition-colors"
+            />
+          </div>
+
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => setSort(sortCycle[(sortCycle.indexOf(sort) + 1) % sortCycle.length])}
             className={cn(
-              "flex items-center gap-2 px-4 py-2.5 text-[11px] font-mono uppercase tracking-wider border-b-2 -mb-px transition-colors cursor-pointer",
-              tab === t.key
-                ? "border-foreground/60 text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground/60"
+              "flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[11px] font-mono uppercase tracking-wider transition-colors cursor-pointer",
+              sort !== "updated"
+                ? "border-foreground/20 bg-muted/50 dark:bg-white/4 text-foreground"
+                : "border-border text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 dark:hover:bg-white/3"
             )}
           >
-            <span className="text-[9px] text-zinc-300 dark:text-zinc-700">{t.num}</span>
-            {t.label}
-            <span
+            <ArrowUpDown className="w-3 h-3" />
+            {sortLabels[sort]}
+          </button>
+        </div>
+
+        {/* Row 2: Category tabs */}
+        <div className="flex items-center border-b border-border/40">
+          {tabItems.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
               className={cn(
-                "text-[9px] px-1.5 py-0.5 border",
+                "relative flex items-center gap-1.5 px-3 pb-2.5 pt-1 text-[12px] transition-colors cursor-pointer",
                 tab === t.key
-                  ? "border-zinc-300 dark:border-zinc-700 text-foreground"
-                  : "border-zinc-200 dark:border-zinc-800 text-muted-foreground/60"
+                  ? "text-foreground"
+                  : "text-muted-foreground/50 hover:text-foreground/70"
               )}
             >
-              {t.count}
-            </span>
-          </button>
-        ))}
+              {t.icon}
+              <span className="hidden sm:inline">{t.label}</span>
+              <span
+                className={cn(
+                  "text-[10px] tabular-nums font-mono",
+                  tab === t.key ? "text-foreground/50" : "text-muted-foreground/30"
+                )}
+              >
+                {t.count}
+              </span>
+              {tab === t.key && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Issue List */}
-      <div className="border border-border divide-y divide-border">
-        {items.map((issue) => {
-          const repo = extractRepoName(issue.repository_url);
+      {filtered.length === 0 ? (
+        <div className="py-16 text-center">
+          <CircleDot className="w-8 h-8 mx-auto text-muted-foreground/30 mb-3" />
+          <p className="text-xs text-muted-foreground/60 font-mono">
+            {search
+              ? "No matching issues"
+              : "No issues in this category"}
+          </p>
+        </div>
+      ) : (
+        <div className="border border-border divide-y divide-border">
+          {filtered.map((issue) => {
+            const repo = extractRepoName(issue.repository_url);
 
-          return (
-            <Link
-              key={issue.id}
-              href={toInternalUrl(issue.html_url)}
-              className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/60 dark:hover:bg-white/3 transition-colors"
-            >
-              <CircleDot className="w-3.5 h-3.5 text-success shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-foreground truncate group-hover:text-foreground transition-colors">
-                    {issue.title}
-                  </span>
-                  {issue.labels
-                    .filter((l) => l.name)
-                    .slice(0, 3)
-                    .map((label) => (
-                      <span
-                        key={label.name}
-                        className="text-[9px] font-mono px-1.5 py-0.5 border shrink-0"
-                        style={{
-                          borderColor: `#${label.color || "888"}30`,
-                          color: `#${label.color || "888"}`,
-                        }}
-                      >
-                        {label.name}
+            return (
+              <Link
+                key={issue.id}
+                href={toInternalUrl(issue.html_url)}
+                className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
+              >
+                <CircleDot className="w-4 h-4 text-success shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-foreground truncate group-hover:text-foreground/90 transition-colors">
+                      {issue.title}
+                    </span>
+                    {issue.labels
+                      .filter((l) => l.name)
+                      .slice(0, 3)
+                      .map((label) => (
+                        <span
+                          key={label.name}
+                          className="text-[9px] font-mono px-1.5 py-0.5 border shrink-0 rounded-sm"
+                          style={{
+                            borderColor: `#${label.color || "888"}30`,
+                            color: `#${label.color || "888"}`,
+                          }}
+                        >
+                          {label.name}
+                        </span>
+                      ))}
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <span className="text-[11px] font-mono text-muted-foreground/50">
+                      {repo}#{issue.number}
+                    </span>
+                    {issue.user && issue.user.login !== username && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
+                        <User className="w-3 h-3" />
+                        {issue.user.login}
                       </span>
-                    ))}
-                </div>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-[11px] font-mono text-muted-foreground/70">
-                    {repo}#{issue.number}
-                  </span>
-                  {issue.user && issue.user.login !== username && (
-                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
-                      <User className="w-3 h-3" />
-                      {issue.user.login}
+                    )}
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground/40 font-mono">
+                      <Clock className="w-3 h-3" />
+                      <TimeAgo date={issue.updated_at} />
                     </span>
-                  )}
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
-                    <Clock className="w-3 h-3" />
-                    <TimeAgo date={issue.updated_at} />
-                  </span>
-                  {issue.comments > 0 && (
-                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
-                      <MessageSquare className="w-3 h-3" />
-                      {issue.comments}
-                    </span>
-                  )}
+                    {issue.comments > 0 && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground/40">
+                        <MessageSquare className="w-3 h-3" />
+                        {issue.comments}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <CopyLinkButton
-                owner={repo.split("/")[0]}
-                repo={repo.split("/")[1]}
-                number={issue.number}
-                type="issues"
-                iconOnly
-              />
-            </Link>
-          );
-        })}
-
-        {items.length === 0 && (
-          <div className="py-16 text-center">
-            <CircleDot className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
-            <p className="text-xs text-muted-foreground font-mono">
-              No issues in this category
-            </p>
-          </div>
-        )}
-      </div>
+                <CopyLinkButton
+                  owner={repo.split("/")[0]}
+                  repo={repo.split("/")[1]}
+                  number={issue.number}
+                  type="issues"
+                  iconOnly
+                />
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

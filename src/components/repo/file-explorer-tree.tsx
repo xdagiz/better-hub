@@ -108,7 +108,7 @@ function FileSearchBar({
     (filePath: string) => {
       setInputValue("");
       setSuggestions([]);
-      router.push(`/repos/${owner}/${repo}/blob/${defaultBranch}/${encodeFilePath(filePath)}`);
+      router.push(`/${owner}/${repo}/blob/${defaultBranch}/${encodeFilePath(filePath)}`);
     },
     [router, owner, repo, defaultBranch]
   );
@@ -146,7 +146,7 @@ function FileSearchBar({
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full text-[11px] font-mono pl-7 pr-7 py-1.5 bg-transparent border border-border rounded focus:outline-none focus:ring-1 focus:ring-zinc-400/30 dark:focus:ring-zinc-600/30 placeholder:text-muted-foreground/50"
+          className="w-full text-[11px] font-mono pl-7 pr-7 py-1.5 bg-transparent border border-border rounded focus:outline-none focus:ring-1 focus:ring-muted-foreground/30 placeholder:text-muted-foreground/50"
         />
         {inputValue && (
           <button
@@ -176,8 +176,8 @@ function FileSearchBar({
                 className={cn(
                   "flex items-center gap-2 w-full text-left px-2.5 py-1.5 transition-colors cursor-pointer",
                   i === selectedIdx
-                    ? "bg-muted/70 dark:bg-zinc-800/50"
-                    : "hover:bg-muted/40 dark:hover:bg-zinc-800/30"
+                    ? "bg-muted/70"
+                    : "hover:bg-muted/40"
                 )}
               >
                 <FileTypeIcon name={node.name} type="file" className="w-3.5 h-3.5 shrink-0" />
@@ -208,7 +208,7 @@ export function FileExplorerTree({
   const searchIndex = useMemo(() => buildSearchIndex(tree), [tree]);
 
   const currentPath = useMemo(() => {
-    const base = `/repos/${owner}/${repo}`;
+    const base = `/${owner}/${repo}`;
     const blobPrefix = `${base}/blob/${defaultBranch}/`;
     const treePrefix = `${base}/tree/${defaultBranch}/`;
     if (pathname.startsWith(blobPrefix)) return decodeURIComponent(pathname.slice(blobPrefix.length));
@@ -297,14 +297,14 @@ const TreeNode = memo(function TreeNode({
           onClick={() => onToggle(node.path)}
           className={cn(
             "flex items-center gap-1.5 w-full text-left py-[3px] pr-2 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors group relative",
-            isActive && "bg-muted/70 dark:bg-zinc-800/50"
+            isActive && "bg-muted/70"
           )}
           style={{ paddingLeft }}
         >
           {Array.from({ length: depth }).map((_, i) => (
             <span
               key={i}
-              className="absolute top-0 bottom-0 w-px bg-zinc-200/60 dark:bg-zinc-800/60"
+              className="absolute top-0 bottom-0 w-px bg-border/60"
               style={{ left: i * 16 + 16 }}
             />
           ))}
@@ -350,18 +350,18 @@ const TreeNode = memo(function TreeNode({
 
   return (
     <Link
-      href={`/repos/${owner}/${repo}/blob/${defaultBranch}/${encodeFilePath(node.path)}`}
+      href={`/${owner}/${repo}/blob/${defaultBranch}/${encodeFilePath(node.path)}`}
       prefetch={true}
       className={cn(
         "flex items-center gap-1.5 py-[3px] pr-2 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors relative",
-        isActive && "bg-muted/70 dark:bg-zinc-800/50"
+        isActive && "bg-muted/70"
       )}
       style={{ paddingLeft: paddingLeft + 15 }}
     >
       {Array.from({ length: depth }).map((_, i) => (
         <span
           key={i}
-          className="absolute top-0 bottom-0 w-px bg-zinc-200/60 dark:bg-zinc-800/60"
+          className="absolute top-0 bottom-0 w-px bg-border/60"
           style={{ left: i * 16 + 16 }}
         />
       ))}

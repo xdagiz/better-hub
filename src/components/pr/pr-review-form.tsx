@@ -44,14 +44,14 @@ const reviewOptions: {
     label: "Approve",
     desc: "Approve merging these changes.",
     icon: Check,
-    accent: "text-emerald-500",
+    accent: "text-success",
   },
   {
     key: "REQUEST_CHANGES",
     label: "Request changes",
     desc: "Changes must be addressed before merging.",
     icon: AlertTriangle,
-    accent: "text-amber-500",
+    accent: "text-warning",
   },
 ];
 
@@ -95,9 +95,9 @@ export function PRReviewForm({ owner, repo, pullNumber, participants }: PRReview
         className={cn(
           "flex items-center gap-1.5 px-3 py-1.5 text-xs",
           "border border-border",
-          "text-foreground/80 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+          "text-foreground/80 hover:text-foreground hover:bg-muted",
           "transition-all cursor-pointer",
-          open && "bg-zinc-100 dark:bg-zinc-800/60"
+          open && "bg-muted"
         )}
       >
         <Eye className="w-3.5 h-3.5" />
@@ -185,7 +185,7 @@ export function PRReviewForm({ owner, repo, pullNumber, participants }: PRReview
           {/* Error */}
           {error && (
             <div className="px-3 pb-2">
-              <p className="text-[11px] text-red-500">{error}</p>
+              <p className="text-[11px] text-destructive">{error}</p>
             </div>
           )}
 

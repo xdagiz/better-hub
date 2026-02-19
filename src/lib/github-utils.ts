@@ -42,13 +42,17 @@ export function toInternalUrl(htmlUrl: string): string {
   const parsed = parseGitHubUrl(htmlUrl);
   if (!parsed) return htmlUrl;
 
+  if (parsed.type === "user") return `/users/${parsed.owner}`;
+
   const { owner, repo, type, number, path } = parsed;
-  const base = `/repos/${owner}/${repo}`;
+  const base = `/${owner}/${repo}`;
 
   if (type === "pull") return `${base}/pulls/${number}`;
   if (type === "issue") return `${base}/issues/${number}`;
   if (type === "tree" && path) return `${base}/tree/${path}`;
   if (type === "blob" && path) return `${base}/blob/${path}`;
+  if (type === "commits") return `${base}/commits`;
+  if (type === "commit" && path) return `${base}/commits/${path}`;
   if (type === "repo") return base;
 
   return htmlUrl;
@@ -67,21 +71,41 @@ export function toAppUrl(htmlUrl: string): string {
   return internalPath;
 }
 
-export function parseGitHubUrl(
-  htmlUrl: string
-): {
+/** Known GitHub top-level paths that are NOT user profiles */
+const GITHUB_NON_USER_PATHS = new Set([
+  "settings", "explore", "trending", "topics", "collections",
+  "events", "sponsors", "issues", "pulls", "codespaces",
+  "marketplace", "notifications", "new", "login", "signup",
+  "join", "organizations", "orgs", "about", "pricing",
+  "security", "features", "enterprise", "team", "customer-stories",
+  "readme", "search", "stars", "watching",
+]);
+
+type ParsedGitHubUrl = {
   owner: string;
   repo: string;
-  type: "repo" | "pull" | "issue" | "tree" | "blob";
+  type: "repo" | "pull" | "issue" | "tree" | "blob" | "commits" | "commit";
   number?: number;
   path?: string;
-} | null {
+} | {
+  owner: string;
+  type: "user";
+};
+
+export function parseGitHubUrl(htmlUrl: string): ParsedGitHubUrl | null {
   try {
     const url = new URL(htmlUrl);
     if (url.hostname !== "github.com") return null;
 
     const parts = url.pathname.split("/").filter(Boolean);
-    if (parts.length < 2) return null;
+    if (parts.length === 0) return null;
+
+    // Single segment: github.com/username
+    if (parts.length === 1) {
+      const name = parts[0];
+      if (GITHUB_NON_USER_PATHS.has(name.toLowerCase())) return null;
+      return { owner: name, type: "user" };
+    }
 
     const [owner, repo, ...rest] = parts;
 
@@ -94,6 +118,10 @@ export function parseGitHubUrl(
       return { owner, repo, type: "tree", path: rest.slice(1).join("/") };
     if (rest[0] === "blob")
       return { owner, repo, type: "blob", path: rest.slice(1).join("/") };
+    if (rest[0] === "commits" && rest.length === 1)
+      return { owner, repo, type: "commits" };
+    if (rest[0] === "commit" && rest[1])
+      return { owner, repo, type: "commit", path: rest[1] };
 
     return { owner, repo, type: "repo" };
   } catch {

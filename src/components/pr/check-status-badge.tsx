@@ -18,12 +18,12 @@ import type { CheckStatus, CheckRun } from "@/lib/github";
 function CheckIcon({ state, className }: { state: CheckRun["state"]; className?: string }) {
   switch (state) {
     case "success":
-      return <CheckCircle2 className={cn("text-emerald-500", className)} />;
+      return <CheckCircle2 className={cn("text-success", className)} />;
     case "failure":
     case "error":
-      return <XCircle className={cn("text-red-400", className)} />;
+      return <XCircle className={cn("text-destructive", className)} />;
     case "pending":
-      return <Clock className={cn("text-yellow-500", className)} />;
+      return <Clock className={cn("text-warning", className)} />;
     case "neutral":
       return <MinusCircle className={cn("text-muted-foreground/60", className)} />;
     case "skipped":
@@ -48,10 +48,10 @@ export function CheckStatusBadge({
 
   const colorClass =
     checkStatus.state === "success"
-      ? "text-emerald-500"
+      ? "text-success"
       : checkStatus.state === "pending"
-        ? "text-yellow-500"
-        : "text-red-400";
+        ? "text-warning"
+        : "text-destructive";
 
   return (
     <div ref={ref} className="relative">
@@ -106,16 +106,16 @@ export function CheckStatusBadge({
                 </span>
                 <span className={cn(
                   "font-mono text-[9px] uppercase tracking-wider shrink-0",
-                  check.state === "success" ? "text-emerald-500/70" :
-                  check.state === "pending" ? "text-yellow-500/70" :
-                  check.state === "failure" || check.state === "error" ? "text-red-400/70" :
+                  check.state === "success" ? "text-success/70" :
+                  check.state === "pending" ? "text-warning/70" :
+                  check.state === "failure" || check.state === "error" ? "text-destructive/70" :
                   "text-muted-foreground/40"
                 )}>
                   {check.state}
                 </span>
                 {check.runId && owner && repo ? (
                   <Link
-                    href={`/repos/${owner}/${repo}/actions/${check.runId}`}
+                    href={`/${owner}/${repo}/actions/${check.runId}`}
                     onClick={(e) => e.stopPropagation()}
                     className="shrink-0 text-muted-foreground/40 hover:text-foreground transition-colors"
                   >

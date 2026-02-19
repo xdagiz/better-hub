@@ -31,11 +31,11 @@ function getLevel(count: number): number {
 }
 
 const LEVEL_CLASSES = [
-  "[background:#ebedf0] dark:[background:rgba(255,255,255,0.04)]",
-  "[background:#d4e8b8] dark:[background:#0a3520]",
-  "[background:#8fce70] dark:[background:#005a28]",
-  "[background:#449e48] dark:[background:#26a641]",
-  "[background:#196127] dark:[background:#39d353]",
+  "bg-[var(--contrib-0)]",
+  "bg-[var(--contrib-1)]",
+  "bg-[var(--contrib-2)]",
+  "bg-[var(--contrib-3)]",
+  "bg-[var(--contrib-4)]",
 ];
 
 const CELL = 10;

@@ -76,7 +76,7 @@ export default async function RepoPage({
     <div>
       <TrackView
         type="repo"
-        url={`/repos/${owner}/${repo}`}
+        url={`/${owner}/${repo}`}
         title={`${owner}/${repo}`}
         subtitle={repoData.description || "No description"}
         image={(repoData as any).owner?.avatar_url}
@@ -110,8 +110,8 @@ export default async function RepoPage({
       />
 
       {readme && (
-        <div className="mt-6 border border-border rounded-md overflow-hidden dark:bg-zinc-900/60">
-          <div className="px-4 py-2 border-b border-border bg-muted/30 dark:bg-zinc-800/50">
+        <div className="mt-6 border border-border rounded-md overflow-hidden">
+          <div className="px-4 py-2 border-b border-border bg-muted/30">
             <span className="text-[11px] font-mono text-muted-foreground">
               README.md
             </span>

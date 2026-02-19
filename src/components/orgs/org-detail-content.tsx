@@ -278,13 +278,13 @@ export function OrgDetailContent({ org, repos }: { org: OrgDetails; repos: OrgRe
       )}
 
       {/* Repo list */}
-      <div className="flex-1 min-h-0 overflow-y-auto border border-border rounded-md divide-y divide-zinc-100 dark:divide-zinc-800/50">
+      <div className="flex-1 min-h-0 overflow-y-auto border border-border rounded-md divide-y divide-border/50">
         {filtered.map((repo) => {
           const langColor = repo.language ? languageColors[repo.language] || "#8b949e" : null;
           return (
             <Link
               key={repo.id}
-              href={`/repos/${repo.full_name}`}
+              href={`/${repo.full_name}`}
               className="group flex gap-3.5 px-4 py-3.5 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors"
             >
               <div className="shrink-0 pt-1.5">
@@ -303,18 +303,18 @@ export function OrgDetailContent({ org, repos }: { org: OrgDetails; repos: OrgRe
                     {repo.name}
                   </span>
                   {repo.private && (
-                    <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-zinc-300/60 dark:border-zinc-700/60 text-muted-foreground rounded-full">
+                    <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-border/60 text-muted-foreground rounded-full">
                       <Lock className="w-2 h-2" />
                       Private
                     </span>
                   )}
                   {repo.archived && (
-                    <span className="text-[9px] font-mono px-1.5 py-px border border-amber-400/30 text-amber-600 dark:text-amber-400/80 rounded-full">
+                    <span className="text-[9px] font-mono px-1.5 py-px border border-warning/30 text-warning rounded-full">
                       Archived
                     </span>
                   )}
                   {repo.fork && (
-                    <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-zinc-300/60 dark:border-zinc-700/60 text-muted-foreground rounded-full">
+                    <span className="flex items-center gap-0.5 text-[9px] font-mono px-1.5 py-px border border-border/60 text-muted-foreground rounded-full">
                       <GitFork className="w-2 h-2" />
                       Fork
                     </span>

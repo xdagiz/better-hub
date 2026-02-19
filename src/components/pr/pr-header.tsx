@@ -62,28 +62,28 @@ export function PRHeader({
 }: PRHeaderProps) {
   const statusConfig = merged
     ? {
-        dot: "bg-purple-500",
-        text: "text-purple-600 dark:text-purple-400",
+        dot: "bg-alert-important",
+        text: "text-alert-important",
         icon: GitMerge,
         label: "Merged",
       }
     : state === "open"
       ? draft
         ? {
-            dot: "bg-zinc-400",
+            dot: "bg-muted-foreground",
             text: "text-muted-foreground",
             icon: GitPullRequest,
             label: "Draft",
           }
         : {
-            dot: "bg-emerald-500",
-            text: "text-emerald-600 dark:text-emerald-400",
+            dot: "bg-success",
+            text: "text-success",
             icon: GitPullRequest,
             label: "Open",
           }
       : {
-          dot: "bg-red-500",
-          text: "text-red-600 dark:text-red-400",
+          dot: "bg-destructive",
+          text: "text-destructive",
           icon: XCircle,
           label: "Closed",
         };
@@ -139,7 +139,7 @@ export function PRHeader({
         </span>
 
         {/* Separator */}
-        <span className="w-px h-3 bg-zinc-200/80 dark:bg-zinc-800/80" />
+        <span className="w-px h-3 bg-border" />
 
         {/* Branch */}
         <span className="flex items-center gap-1 font-mono text-muted-foreground/60 text-[10px]">
@@ -150,12 +150,12 @@ export function PRHeader({
         </span>
 
         {/* Separator */}
-        <span className="w-px h-3 bg-zinc-200/80 dark:bg-zinc-800/80" />
+        <span className="w-px h-3 bg-border" />
 
         {/* Stats */}
         <span className="flex items-center gap-1.5 font-mono text-[10px]">
-          <span className="text-emerald-500">+{additions}</span>
-          <span className="text-red-400">-{deletions}</span>
+          <span className="text-success">+{additions}</span>
+          <span className="text-destructive">-{deletions}</span>
           <span className="text-muted-foreground/60">
             {changedFiles} file{changedFiles !== 1 ? "s" : ""}
           </span>
@@ -163,7 +163,7 @@ export function PRHeader({
 
         {checkStatus && (
           <>
-            <span className="w-px h-3 bg-zinc-200/80 dark:bg-zinc-800/80" />
+            <span className="w-px h-3 bg-border" />
             <CheckStatusBadge checkStatus={checkStatus} owner={owner} repo={repo} />
           </>
         )}
@@ -191,7 +191,7 @@ export function PRHeader({
         {/* Review statuses */}
         {reviewStatuses && reviewStatuses.length > 0 && (
           <>
-            <span className="w-px h-3 bg-zinc-200/80 dark:bg-zinc-800/80" />
+            <span className="w-px h-3 bg-border" />
             {reviewStatuses.map((r) => (
               <Link
                 key={r.login}
@@ -211,8 +211,8 @@ export function PRHeader({
                     className={cn(
                       "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full flex items-center justify-center ring-2 ring-background",
                       r.state === "APPROVED"
-                        ? "bg-emerald-500"
-                        : "bg-amber-500"
+                        ? "bg-success"
+                        : "bg-warning"
                     )}
                   >
                     {r.state === "APPROVED" ? (

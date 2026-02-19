@@ -1,5 +1,5 @@
 import { getFileContent, getRepoBranches, getRepoTags } from "@/lib/github";
-import { parseRefAndPath, formatBytes } from "@/lib/github-utils";
+import { parseRefAndPath, formatBytes, getLanguageFromFilename } from "@/lib/github-utils";
 import { CodeViewer } from "@/components/repo/code-viewer";
 import { MarkdownRenderer } from "@/components/shared/markdown-renderer";
 import { MarkdownBlobView } from "@/components/repo/markdown-blob-view";
@@ -109,10 +109,12 @@ export default async function BlobPage({
   const fileDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
 
   if (isMarkdown) {
+    const lang = getLanguageFromFilename(filename);
+    const mdLineCount = file.content.split("\n").length;
     return (
       <MarkdownBlobView
         rawView={
-          <CodeViewer content={file.content} filename={filename} filePath={path} fileSize={file.size} />
+          <CodeViewer content={file.content} filename={filename} filePath={path} fileSize={file.size} hideHeader />
         }
         previewView={
           <div className="border border-border rounded-md overflow-hidden">
@@ -121,6 +123,12 @@ export default async function BlobPage({
             </div>
           </div>
         }
+        fileSize={file.size}
+        lineCount={mdLineCount}
+        language={lang}
+        content={file.content}
+        filePath={path}
+        filename={filename}
       />
     );
   }

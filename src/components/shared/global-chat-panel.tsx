@@ -16,11 +16,25 @@ import {
 
 // ─── Page hints ─────────────────────────────────────────────────────────────
 
+/** Known top-level app routes that are NOT owner/repo paths */
+const KNOWN_PREFIXES = new Set([
+  "repos", "prs", "issues", "notifications", "settings", "search",
+  "trending", "users", "orgs", "dashboard", "api", "collections",
+]);
+
+/** Try to match /:owner/:repo from a clean pathname (skipping known app prefixes) */
+function matchRepoFromPathname(pathname: string): [string, string] | null {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length < 2) return null;
+  if (KNOWN_PREFIXES.has(segments[0])) return null;
+  return [segments[0], segments[1]];
+}
+
 /** Derive smart suggestions, placeholder, and description from the current pathname */
 function getPageHints(pathname: string) {
-  const repoMatch = pathname.match(/^\/repos\/([^/]+)\/([^/]+)/);
+  const repoMatch = matchRepoFromPathname(pathname);
   if (repoMatch) {
-    const [, owner, repo] = repoMatch;
+    const [owner, repo] = repoMatch;
     const slug = `${owner}/${repo}`;
 
     if (/\/pulls\/?$/.test(pathname)) {
@@ -87,14 +101,43 @@ function getPageHints(pathname: string) {
   return {
     suggestions: ["Search repos", "Show my notifications", "List my PRs"],
     placeholder: "Ask Ghost anything...",
-    description: "Your AI assistant for GitHub. Search repos, manage issues, navigate, and more.",
+    description: "Your haunted assistant for all things here.",
   };
+}
+
+/**
+ * Derive a short context-aware label for a new Ghost tab.
+ * Format: "Label · detail" where detail is shown dimmer in the UI.
+ */
+function getTabLabelFromPathname(pathname: string): string {
+  const repoMatch = matchRepoFromPathname(pathname);
+  if (repoMatch) {
+    const repo = repoMatch[1];
+    const prMatch = pathname.match(/\/pulls\/(\d+)/);
+    if (prMatch) return `PR #${prMatch[1]} · ${repo}`;
+    const issueMatch = pathname.match(/\/issues\/(\d+)/);
+    if (issueMatch) return `Issue #${issueMatch[1]} · ${repo}`;
+    if (/\/pulls\/?$/.test(pathname)) return `PRs · ${repo}`;
+    if (/\/issues\/?$/.test(pathname)) return `Issues · ${repo}`;
+    if (/\/commits/.test(pathname)) return `Commits · ${repo}`;
+    return repo;
+  }
+  const userMatch = pathname.match(/^\/users\/([^/]+)/);
+  if (userMatch) return userMatch[1];
+  if (pathname.startsWith("/prs")) return "My PRs";
+  if (pathname.startsWith("/issues")) return "My Issues";
+  if (pathname.startsWith("/notifications")) return "Notifs";
+  if (pathname.startsWith("/repos")) return "Repos";
+  if (pathname.startsWith("/trending")) return "Trending";
+  if (pathname.startsWith("/search")) return "Search";
+  if (pathname === "/" || pathname.startsWith("/dashboard")) return "Home";
+  return "";
 }
 
 // ─── Panel ──────────────────────────────────────────────────────────────────
 
 export function GlobalChatPanel() {
-  const { state, tabState, closeChat, registerContextHandler, addTab, closeTab, switchTab } = useGlobalChat();
+  const { state, tabState, closeChat, registerContextHandler, addTab, closeTab, switchTab, renameTab } = useGlobalChat();
   const [contexts, setContexts] = useState<InlineContext[]>([]);
   const prevContextKeyRef = useRef<string | null>(null);
   const pathname = usePathname();
@@ -105,6 +148,36 @@ export function GlobalChatPanel() {
   // and causes hydration mismatches.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // ── Resizable width ────────────────────────────────────────────────────
+  const DEFAULT_PANEL_WIDTH = 380;
+  const MIN_PANEL_WIDTH = 320;
+  const MAX_PANEL_WIDTH = 700;
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startWidth: panelWidth };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      // Dragging left = increasing width (panel anchored to right)
+      const delta = dragRef.current.startX - ev.clientX;
+      const raw = dragRef.current.startWidth + delta;
+      setPanelWidth(Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, raw)));
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+  }, [panelWidth]);
 
   // Active file from URL ?file= param (set by PR diff viewer)
   const activeFile = searchParams.get("file") ?? undefined;
@@ -228,7 +301,7 @@ export function GlobalChatPanel() {
       <div className="flex items-center gap-1.5 px-2.5 pt-2">
         {contexts.length === 1 ? (
           <span
-            className="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/60 text-[10px] font-mono text-muted-foreground/70 max-w-[200px]"
+            className="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded bg-muted text-[10px] font-mono text-muted-foreground/70 max-w-[200px]"
           >
             <Code2 className="w-2.5 h-2.5 text-muted-foreground/40 shrink-0" />
             <span className="truncate">
@@ -247,7 +320,7 @@ export function GlobalChatPanel() {
             </button>
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 pl-1.5 pr-0.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/60 text-[10px] font-mono text-muted-foreground/70">
+          <span className="inline-flex items-center gap-1.5 pl-1.5 pr-0.5 py-0.5 rounded bg-muted text-[10px] font-mono text-muted-foreground/70">
             <Code2 className="w-2.5 h-2.5 text-muted-foreground/40 shrink-0" />
             <span className="size-4 rounded-full bg-foreground/10 flex items-center justify-center text-[9px] font-semibold text-muted-foreground/80 tabular-nums">
               {contexts.length}
@@ -280,15 +353,26 @@ export function GlobalChatPanel() {
     <>
     <div
       className={cn(
-        "fixed top-10 right-0 z-40 h-[calc(100dvh-2.5rem)] w-full sm:w-[380px]",
+        "fixed top-10 right-0 z-40 h-[calc(100dvh-2.5rem)] w-full",
         "bg-background border-l border-border",
-        "flex flex-col shadow-[-4px_0_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-[-4px_0_12px_-4px_rgba(0,0,0,0.25)]",
+        "flex flex-row shadow-[-4px_0_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-[-4px_0_12px_-4px_rgba(0,0,0,0.25)]",
         "transition-transform duration-300 ease-in-out",
         state.isOpen
           ? "translate-x-0"
           : "translate-x-full pointer-events-none"
       )}
+      style={{ maxWidth: panelWidth }}
     >
+      {/* Resize drag handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        className="hidden sm:flex shrink-0 w-1 cursor-col-resize items-center justify-center hover:bg-foreground/10 active:bg-foreground/15 transition-colors group/resize"
+      >
+        <div className="w-[2px] h-8 rounded-full bg-border group-hover/resize:bg-foreground/20 group-active/resize:bg-foreground/30 transition-colors" />
+      </div>
+
+      {/* Panel content */}
+      <div className="flex-1 min-w-0 flex flex-col">
       {/* Side close tab */}
       <button
         type="button"
@@ -307,7 +391,7 @@ export function GlobalChatPanel() {
       </button>
 
       {/* Panel header */}
-      <div className="group/header shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/60">
+      <div className="group/header shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-border/60">
         <Ghost className="w-3.5 h-3.5 text-foreground/50" />
         <span className="text-xs font-medium text-foreground/70 truncate">
           Ghost
@@ -315,7 +399,7 @@ export function GlobalChatPanel() {
         <button
           type="button"
           onClick={closeChat}
-          className="ml-auto p-0.5 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-zinc-200/50 dark:hover:bg-zinc-700/40 opacity-0 group-hover/header:opacity-100 transition-all duration-150 cursor-pointer"
+          className="ml-auto p-0.5 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-accent/60 opacity-0 group-hover/header:opacity-100 transition-all duration-150 cursor-pointer"
         >
           <X className="w-3 h-3" />
         </button>
@@ -323,7 +407,7 @@ export function GlobalChatPanel() {
 
       {/* Tab bar */}
       <div className="shrink-0 flex items-center px-1.5">
-        <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
           {tabState.tabs.map((tab) => (
             <button
               key={tab.id}
@@ -336,7 +420,14 @@ export function GlobalChatPanel() {
                   : "border-transparent text-muted-foreground/40 hover:text-muted-foreground/60"
               )}
             >
-              <span className="truncate max-w-[80px]">{tab.label}</span>
+              <span className="truncate max-w-[120px]">
+                {tab.label.includes(" · ") ? (
+                  <>
+                    {tab.label.split(" · ")[0]}
+                    <span className="opacity-40"> · {tab.label.split(" · ")[1]}</span>
+                  </>
+                ) : tab.label}
+              </span>
               {tabState.tabs.length > 1 && (
                 <span
                   role="button"
@@ -361,8 +452,8 @@ export function GlobalChatPanel() {
         </div>
         <button
           type="button"
-          onClick={addTab}
-          className="shrink-0 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-zinc-200/50 dark:hover:bg-zinc-700/40 transition-all duration-150 cursor-pointer ml-1"
+          onClick={() => addTab(getTabLabelFromPathname(pathname))}
+          className="shrink-0 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-accent/60 transition-all duration-150 cursor-pointer ml-1"
           title="New tab"
         >
           <Plus className="w-3 h-3" />
@@ -391,7 +482,11 @@ export function GlobalChatPanel() {
               emptyDescription={effectiveEmptyDescription}
               suggestions={effectiveSuggestions}
               inputPrefix={isActive ? inputPrefix : null}
-              onNewChat={() => setContexts([])}
+              onNewChat={() => {
+                setContexts([]);
+                const label = getTabLabelFromPathname(pathname);
+                if (label && activeTabId) renameTab(activeTabId, label);
+              }}
               mentionableFiles={mentionableFiles}
               onAddFileContext={handleAddFileContext}
               attachedContexts={isActive ? contexts : []}
@@ -399,10 +494,12 @@ export function GlobalChatPanel() {
               onSearchRepoFiles={repoFileSearch ? handleSearchRepoFiles : undefined}
               onFetchFileContent={repoFileSearch ? handleFetchFileContent : undefined}
               hashMentionPrFiles={mentionableFiles}
+              autoFocus={isActive}
             />
           </div>
         );
       })}
+    </div>
     </div>
     </>
   );

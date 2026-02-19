@@ -78,7 +78,7 @@ function repoAge(createdAt: string): string {
 // --- Section wrapper ---
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="border border-dashed border-zinc-300/70 dark:border-zinc-700/50 p-4">
+    <div className="border border-dashed border-border/60 p-4">
       <div className="flex items-baseline gap-2 mb-4">
         <h3 className="text-sm font-medium text-foreground">{title}</h3>
         {subtitle && <span className="text-xs font-mono text-muted-foreground/60">{subtitle}</span>}
@@ -91,7 +91,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 // --- Stat card ---
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 px-3 py-2.5 border border-dashed border-zinc-300/70 dark:border-zinc-700/50">
+    <div className="flex flex-col gap-1 px-3 py-2.5 border border-dashed border-border/60">
       <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/60">{label}</span>
       <span className="text-sm font-medium tabular-nums text-foreground/80">{value}</span>
     </div>
@@ -106,7 +106,7 @@ function Sparkline({ data, maxVal }: { data: number[]; maxVal: number }) {
       {data.map((v, i) => (
         <div
           key={i}
-          className="w-1 bg-emerald-500/60 rounded-t-sm"
+          className="w-1 bg-success/60 rounded-t-sm"
           style={{ height: maxVal > 0 ? Math.max(1, (v / maxVal) * h) : 1 }}
         />
       ))}
@@ -162,12 +162,12 @@ function CommitActivitySection({ data }: { data: CommitActivityWeek[] }) {
               <div
                 className={cn(
                   "w-full rounded-t-sm transition-colors",
-                  hovered === i ? "bg-emerald-400" : "bg-emerald-500/70"
+                  hovered === i ? "bg-success/80" : "bg-success/70"
                 )}
                 style={{ height: Math.max(1, (week.total / maxCommits) * chartHeight) }}
               />
               {hovered === i && (
-                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap px-2 py-1 text-[10px] font-mono bg-zinc-900 dark:bg-zinc-800 text-white rounded shadow-lg">
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap px-2 py-1 text-[10px] font-mono bg-card text-foreground rounded shadow-lg">
                   {formatWeekDate(week.week)} — {week.total} commit{week.total !== 1 ? "s" : ""}
                 </div>
               )}
@@ -199,7 +199,7 @@ function CodeFrequencySection({ data }: { data: CodeFrequencyWeek[] }) {
     >
       <div className="relative" style={{ height: halfHeight * 2 }}>
         {/* Center line */}
-        <div className="absolute left-0 right-0 top-1/2 h-px bg-zinc-300/50 dark:bg-zinc-700/50" />
+        <div className="absolute left-0 right-0 top-1/2 h-px bg-border/60" />
         <div className="flex items-center gap-px h-full">
           {data.map((week, i) => {
             const addH = maxVal > 0 ? (week.additions / maxVal) * halfHeight : 0;
@@ -216,7 +216,7 @@ function CodeFrequencySection({ data }: { data: CodeFrequencyWeek[] }) {
                   <div
                     className={cn(
                       "w-full rounded-t-sm",
-                      hovered === i ? "bg-emerald-400" : "bg-emerald-500/60"
+                      hovered === i ? "bg-success/80" : "bg-success/60"
                     )}
                     style={{ height: Math.max(0, addH) }}
                   />
@@ -226,13 +226,13 @@ function CodeFrequencySection({ data }: { data: CodeFrequencyWeek[] }) {
                   <div
                     className={cn(
                       "w-full rounded-b-sm",
-                      hovered === i ? "bg-red-400" : "bg-red-500/60"
+                      hovered === i ? "bg-destructive/80" : "bg-destructive/60"
                     )}
                     style={{ height: Math.max(0, delH) }}
                   />
                 </div>
                 {hovered === i && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap px-2 py-1 text-[10px] font-mono bg-zinc-900 dark:bg-zinc-800 text-white rounded shadow-lg">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap px-2 py-1 text-[10px] font-mono bg-card text-foreground rounded shadow-lg">
                     {formatWeekDate(week.week)} — +{formatNumber(week.additions)} / -{formatNumber(week.deletions)}
                   </div>
                 )}
@@ -243,10 +243,10 @@ function CodeFrequencySection({ data }: { data: CodeFrequencyWeek[] }) {
       </div>
       <div className="flex items-center gap-4 mt-3 text-[10px] font-mono text-muted-foreground/60">
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-sm bg-emerald-500/60" /> Additions
+          <span className="w-2 h-2 rounded-sm bg-success/60" /> Additions
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-sm bg-red-500/60" /> Deletions
+          <span className="w-2 h-2 rounded-sm bg-destructive/60" /> Deletions
         </span>
       </div>
     </Section>
@@ -287,10 +287,10 @@ function ContributorsSection({ contributors }: { contributors: ContributorStats[
               <span className="text-xs font-mono tabular-nums text-foreground/60 ml-auto">
                 {formatNumber(c.total)}
               </span>
-              <span className="text-[10px] font-mono tabular-nums text-emerald-500/80">
+              <span className="text-[10px] font-mono tabular-nums text-success/80">
                 +{formatNumber(totalAdd)}
               </span>
-              <span className="text-[10px] font-mono tabular-nums text-red-500/80">
+              <span className="text-[10px] font-mono tabular-nums text-destructive/80">
                 -{formatNumber(totalDel)}
               </span>
             </div>
@@ -385,19 +385,19 @@ function ParticipationSection({ participation }: { participation: WeeklyParticip
               <div
                 className={cn(
                   "w-full rounded-t-sm",
-                  hovered === i ? "bg-emerald-400/50" : "bg-emerald-500/30"
+                  hovered === i ? "bg-success/50" : "bg-success/30"
                 )}
                 style={{ height: Math.max(0, communityH) }}
               />
               <div
                 className={cn(
                   "w-full",
-                  hovered === i ? "bg-emerald-500" : "bg-emerald-500/70"
+                  hovered === i ? "bg-success" : "bg-success/70"
                 )}
                 style={{ height: Math.max(0, ownerH) }}
               />
               {hovered === i && (
-                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap px-2 py-1 text-[10px] font-mono bg-zinc-900 dark:bg-zinc-800 text-white rounded shadow-lg">
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap px-2 py-1 text-[10px] font-mono bg-card text-foreground rounded shadow-lg">
                   Owner: {ownerVal} | Community: {communityVal}
                 </div>
               )}
@@ -407,10 +407,10 @@ function ParticipationSection({ participation }: { participation: WeeklyParticip
       </div>
       <div className="flex items-center gap-4 mt-3 text-[10px] font-mono text-muted-foreground/60">
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-sm bg-emerald-500/70" /> Owner
+          <span className="w-2 h-2 rounded-sm bg-success/70" /> Owner
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-sm bg-emerald-500/30" /> Community
+          <span className="w-2 h-2 rounded-sm bg-success/30" /> Community
         </span>
       </div>
     </Section>

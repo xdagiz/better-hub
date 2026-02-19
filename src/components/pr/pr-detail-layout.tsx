@@ -122,9 +122,9 @@ export function PRDetailLayout({
               onClick={handleRestoreChat}
               className={cn(
                 "absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-6 h-6 rounded-full",
-                "border border-zinc-200/80 dark:border-zinc-700/80",
-                "bg-white dark:bg-zinc-900 shadow-sm",
-                "text-muted-foreground/60 hover:text-muted-foreground hover:border-zinc-300 dark:hover:border-zinc-600",
+                "border border-border shadow-sm",
+                "bg-background",
+                "text-muted-foreground/60 hover:text-muted-foreground hover:border-border",
                 "cursor-pointer transition-all duration-150"
               )}
               title="Show conversation"
@@ -142,9 +142,9 @@ export function PRDetailLayout({
               onClick={handleRestoreCode}
               className={cn(
                 "absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-6 h-6 rounded-full",
-                "border border-zinc-200/80 dark:border-zinc-700/80",
-                "bg-white dark:bg-zinc-900 shadow-sm",
-                "text-muted-foreground/60 hover:text-muted-foreground hover:border-zinc-300 dark:hover:border-zinc-600",
+                "border border-border shadow-sm",
+                "bg-background",
+                "text-muted-foreground/60 hover:text-muted-foreground hover:border-border",
                 "cursor-pointer transition-all duration-150"
               )}
               title="Show code"

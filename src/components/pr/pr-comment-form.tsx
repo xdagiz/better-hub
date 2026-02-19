@@ -75,9 +75,9 @@ export function PRCommentForm({ owner, repo, pullNumber, userAvatarUrl, userName
       {optimisticComments.map((c) => (
         <div
           key={c.id}
-          className="border border-zinc-200/60 dark:border-zinc-800/50 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className="border border-border/60 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
         >
-          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/40 bg-zinc-50/50 dark:bg-zinc-800/20">
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-card/50">
             {userAvatarUrl ? (
               <Image
                 src={userAvatarUrl}
@@ -87,7 +87,7 @@ export function PRCommentForm({ owner, repo, pullNumber, userAvatarUrl, userName
                 className="rounded-full shrink-0"
               />
             ) : (
-              <div className="w-4 h-4 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+              <div className="w-4 h-4 rounded-full bg-muted-foreground shrink-0" />
             )}
             <span className="text-xs font-medium text-foreground/80">
               {userName || "You"}
@@ -106,8 +106,8 @@ export function PRCommentForm({ owner, repo, pullNumber, userAvatarUrl, userName
       ))}
 
       {/* Comment form */}
-      <div className="border border-zinc-200/60 dark:border-zinc-800/50 rounded-md overflow-hidden">
-        <div className="px-3.5 py-2 border-b border-zinc-200/60 dark:border-zinc-800/40 bg-zinc-50/50 dark:bg-zinc-800/20">
+      <div className="border border-border/60 rounded-md overflow-hidden">
+        <div className="px-3.5 py-2 border-b border-border/60 bg-card/50">
           <div className="flex items-center gap-2">
             {userAvatarUrl && (
               <Image
@@ -141,7 +141,7 @@ export function PRCommentForm({ owner, repo, pullNumber, userAvatarUrl, userName
           <div className="flex items-center justify-between mt-2">
             <div>
               {error && (
-                <span className="text-xs text-red-500">{error}</span>
+                <span className="text-xs text-destructive">{error}</span>
               )}
             </div>
             <button
@@ -150,7 +150,7 @@ export function PRCommentForm({ owner, repo, pullNumber, userAvatarUrl, userName
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md",
                 "border border-border",
-                "text-foreground/80 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+                "text-foreground/80 hover:text-foreground hover:bg-muted/60",
                 "transition-colors cursor-pointer",
                 "disabled:opacity-40 disabled:cursor-not-allowed"
               )}

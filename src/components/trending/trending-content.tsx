@@ -59,7 +59,7 @@ export function TrendingContent({ weekly, daily, monthly }: TrendingContentProps
               className={cn(
                 "px-3 py-1 text-[11px] font-mono transition-colors cursor-pointer rounded-sm",
                 period === p.key
-                  ? "bg-zinc-200/60 dark:bg-zinc-700/50 text-foreground"
+                  ? "bg-accent text-foreground"
                   : "text-muted-foreground/50 hover:text-muted-foreground"
               )}
             >
@@ -74,8 +74,8 @@ export function TrendingContent({ weekly, daily, monthly }: TrendingContentProps
           repos.map((repo, i) => (
             <Link
               key={repo.id}
-              href={`/repos/${repo.full_name}`}
-              className="group flex gap-4 px-4 py-3 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-zinc-100 dark:border-zinc-800/40 last:border-b-0"
+              href={`/${repo.full_name}`}
+              className="group flex gap-4 px-4 py-3 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-border/40 last:border-b-0"
             >
               <span className="text-[11px] font-mono text-muted-foreground/30 tabular-nums w-5 text-right shrink-0 pt-1">
                 {i + 1}

@@ -40,8 +40,8 @@ export function OpenClosedToggle({
             className={cn(
               "text-[9px] px-1.5 py-0.5 border",
               state === s
-                ? "border-zinc-300 dark:border-zinc-700 text-foreground/60"
-                : "border-zinc-200 dark:border-zinc-800 text-muted-foreground/50"
+                ? "border-border text-foreground/60"
+                : "border-border text-muted-foreground/50"
             )}
           >
             {count}
@@ -69,7 +69,7 @@ export function SortCycleButton<S extends string>({
       onClick={() =>
         onSort(cycle[(cycle.indexOf(sort) + 1) % cycle.length])
       }
-      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border border-border hover:text-foreground/60 hover:bg-muted/60 dark:hover:bg-white/3 transition-colors cursor-pointer"
+      className="flex items-center gap-1.5 h-9 px-3 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border border-border rounded-md hover:text-foreground/60 hover:bg-muted/60 dark:hover:bg-white/3 transition-colors cursor-pointer"
     >
       <ArrowUpDown className="w-3 h-3" />
       {labels[sort]}
@@ -91,7 +91,7 @@ export function FiltersButton({
     <button
       onClick={onToggle}
       className={cn(
-        "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border transition-colors cursor-pointer",
+        "flex items-center gap-1.5 h-9 px-3 text-[11px] font-mono uppercase tracking-wider border rounded-md transition-colors cursor-pointer",
         open || activeCount > 0
           ? "border-foreground/30 bg-muted/50 dark:bg-white/4 text-foreground"
           : "border-border text-muted-foreground hover:text-foreground/60 hover:bg-muted/60 dark:hover:bg-white/3"
@@ -146,7 +146,7 @@ export function ListSearchInput({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-transparent border border-border pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-foreground/20 focus:ring-[3px] focus:ring-ring/50 transition-colors rounded-md"
+        className="w-full h-9 bg-transparent border border-border pl-9 pr-4 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-foreground/20 focus:ring-[3px] focus:ring-ring/50 transition-colors rounded-md"
       />
     </div>
   );

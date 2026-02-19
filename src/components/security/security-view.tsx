@@ -70,9 +70,9 @@ function severityColor(severity: string | null): {
   switch (severity?.toLowerCase()) {
     case "critical":
       return {
-        dot: "bg-red-500",
-        text: "text-red-600 dark:text-red-400",
-        border: "border-l-red-500",
+        dot: "bg-destructive",
+        text: "text-destructive",
+        border: "border-l-destructive",
       };
     case "high":
       return {
@@ -82,19 +82,19 @@ function severityColor(severity: string | null): {
       };
     case "medium":
       return {
-        dot: "bg-amber-500",
-        text: "text-amber-600 dark:text-amber-400",
-        border: "border-l-amber-500",
+        dot: "bg-warning",
+        text: "text-warning",
+        border: "border-l-warning",
       };
     case "low":
       return {
-        dot: "bg-emerald-500",
-        text: "text-emerald-600 dark:text-emerald-400",
-        border: "border-l-emerald-500",
+        dot: "bg-success",
+        text: "text-success",
+        border: "border-l-success",
       };
     default:
       return {
-        dot: "bg-zinc-400",
+        dot: "bg-muted-foreground",
         text: "text-muted-foreground/60",
         border: "border-l-transparent",
       };
@@ -199,8 +199,8 @@ export function SecurityView({
                   className={cn(
                     "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
                     section === item.key
-                      ? "bg-zinc-200 dark:bg-zinc-800 text-foreground/70"
-                      : "bg-zinc-100 dark:bg-zinc-800/50 text-muted-foreground/50"
+                      ? "bg-muted text-foreground/70"
+                      : "bg-muted/60 text-muted-foreground/50"
                   )}
                 >
                   {item.count}
@@ -377,8 +377,8 @@ function AdvisoriesSection({
                     className={cn(
                       "text-[9px] px-1.5 py-0.5 border",
                       advisoryTab === tab
-                        ? "border-zinc-300 dark:border-zinc-700 text-foreground/60"
-                        : "border-zinc-200 dark:border-zinc-800 text-muted-foreground/50"
+                        ? "border-border text-foreground/60"
+                        : "border-border text-muted-foreground/50"
                     )}
                   >
                     {count}
@@ -444,7 +444,7 @@ function AdvisoriesSection({
 
             {filteredAdvisories.length === 0 && (
               <div className="py-16 text-center">
-                <ShieldAlert className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+                <ShieldAlert className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-xs text-muted-foreground font-mono">
                   No {advisoryTab === "all" ? "" : advisoryTab + " "}advisories
                 </p>
@@ -560,7 +560,7 @@ function PolicySection({
         </div>
       ) : (
         <div className="px-4 py-16 text-center">
-          <FileText className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+          <FileText className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-xs text-muted-foreground font-mono">
             No security policy found
           </p>

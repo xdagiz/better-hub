@@ -36,6 +36,7 @@ export async function PATCH(request: Request) {
   const allowedFields = [
     "displayName",
     "theme",
+    "colorTheme",
     "ghostModel",
     "useOwnApiKey",
     "openrouterApiKey",

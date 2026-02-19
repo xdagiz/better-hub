@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -17,6 +17,8 @@ import { getRecentViews, type RecentViewItem } from "@/lib/recent-views";
 export function RecentlyViewed() {
   const [views, setViews] = useState<RecentViewItem[]>([]);
   const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setViews(getRecentViews());
@@ -36,21 +38,40 @@ export function RecentlyViewed() {
   if (views.length === 0) return null;
 
   return (
-    <section className="flex-1 min-h-0 flex flex-col border border-border bg-card">
+    <section className="flex-1 min-h-0 flex flex-col border border-border">
       <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-border">
         <History className="w-3 h-3 text-muted-foreground/50" />
         <h2 className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
           Recently viewed
         </h2>
-        <div className="ml-auto relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50" />
-          <input
-            type="text"
-            placeholder="Filter..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-32 focus:w-48 bg-muted/40 dark:bg-white/[0.03] text-[11px] font-mono pl-7 pr-2.5 py-1.5 rounded-md border border-transparent placeholder:text-muted-foreground/40 focus:outline-none focus:border-border focus:bg-transparent transition-all duration-200"
-          />
+        <div className="ml-auto flex items-center">
+          {showSearch ? (
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50" />
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onBlur={() => {
+                  if (!search) setShowSearch(false);
+                }}
+                className="w-40 text-[11px] font-mono pl-7 pr-2.5 py-1.5 rounded-md border border-border bg-transparent placeholder:text-muted-foreground/40 focus:outline-none transition-all duration-200"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setShowSearch(true);
+                setTimeout(() => searchRef.current?.focus(), 0);
+              }}
+              className="p-1.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer"
+            >
+              <Search className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -77,9 +98,9 @@ function RecentViewRow({ item }: { item: RecentViewItem }) {
         className={cn(
           "w-3.5 h-3.5 shrink-0",
           item.state === "merged"
-            ? "text-purple-500"
+            ? "text-alert-important"
             : item.state === "open"
-            ? "text-emerald-500"
+            ? "text-success"
             : "text-muted-foreground/60"
         )}
       />
@@ -88,7 +109,7 @@ function RecentViewRow({ item }: { item: RecentViewItem }) {
         className={cn(
           "w-3.5 h-3.5 shrink-0",
           item.state === "open"
-            ? "text-emerald-500"
+            ? "text-success"
             : "text-muted-foreground/60"
         )}
       />

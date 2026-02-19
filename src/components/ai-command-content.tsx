@@ -8,6 +8,20 @@ import { ArrowUp, Square } from "lucide-react";
 import { AICommandResults } from "@/components/ai-command-results";
 import { AgentIcon } from "@/components/ui/agent-icon";
 
+/** Known top-level app routes that are NOT owner/repo paths */
+const KNOWN_PREFIXES = new Set([
+  "repos", "prs", "issues", "notifications", "settings", "search",
+  "trending", "users", "orgs", "dashboard", "api", "collections",
+]);
+
+/** Try to match /:owner/:repo from a clean pathname (skipping known app prefixes) */
+function matchRepoFromPathname(pathname: string): [string, string] | null {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length < 2) return null;
+  if (KNOWN_PREFIXES.has(segments[0])) return null;
+  return [segments[0], segments[1]];
+}
+
 interface AICommandContentProps {
   onClose: () => void;
   onToggleMode: () => void;
@@ -33,19 +47,19 @@ export default function AICommandContent({
       [key: string]: unknown;
     }> = [];
 
-    const repoMatch = pathname.match(/^\/repos\/([^/]+)\/([^/]+)/);
+    const repoMatch = matchRepoFromPathname(pathname);
     if (repoMatch) {
       entities.push({
         type: "repo",
-        id: `${repoMatch[1]}/${repoMatch[2]}`,
-        name: `${repoMatch[1]}/${repoMatch[2]}`,
-        owner: repoMatch[1],
-        repo: repoMatch[2],
+        id: `${repoMatch[0]}/${repoMatch[1]}`,
+        name: `${repoMatch[0]}/${repoMatch[1]}`,
+        owner: repoMatch[0],
+        repo: repoMatch[1],
       });
     }
 
     let page: string | null = null;
-    if (pathname.startsWith("/repos/") && repoMatch) {
+    if (repoMatch) {
       if (pathname.includes("/issues/")) page = "issue-detail";
       else if (pathname.includes("/issues")) page = "repo-issues";
       else if (pathname.includes("/pulls/")) page = "pr-detail";
@@ -147,7 +161,6 @@ export default function AICommandContent({
               settings: "/settings",
               search: "/search",
               trending: "/trending",
-              collections: "/collections",
               orgs: "/orgs",
             };
             const page = output.page as string;
@@ -156,22 +169,22 @@ export default function AICommandContent({
             router.push(target);
           } else if (action === "openRepo") {
             onClose();
-            router.push(`/repos/${output.owner}/${output.repo}`);
+            router.push(`/${output.owner}/${output.repo}`);
           } else if (action === "openRepoTab") {
             onClose();
-            router.push(`/repos/${output.owner}/${output.repo}/${output.tab}`);
+            router.push(`/${output.owner}/${output.repo}/${output.tab}`);
           } else if (action === "openWorkflowRun") {
             onClose();
-            router.push(`/repos/${output.owner}/${output.repo}/actions/${output.runId}`);
+            router.push(`/${output.owner}/${output.repo}/actions/${output.runId}`);
           } else if (action === "openCommit") {
             onClose();
-            router.push(`/repos/${output.owner}/${output.repo}/commits/${output.sha}`);
+            router.push(`/${output.owner}/${output.repo}/commits/${output.sha}`);
           } else if (action === "openIssue") {
             onClose();
-            router.push(`/repos/${output.owner}/${output.repo}/issues/${output.issueNumber}`);
+            router.push(`/${output.owner}/${output.repo}/issues/${output.issueNumber}`);
           } else if (action === "openPullRequest") {
             onClose();
-            router.push(`/repos/${output.owner}/${output.repo}/pulls/${output.pullNumber}`);
+            router.push(`/${output.owner}/${output.repo}/pulls/${output.pullNumber}`);
           } else if (action === "openUser") {
             onClose();
             router.push(`/users/${output.username}`);
@@ -272,7 +285,7 @@ export default function AICommandContent({
           }}
           onNavigateRepo={(fullName) => {
             onClose();
-            router.push(`/repos/${fullName}`);
+            router.push(`/${fullName}`);
           }}
           onOpenUrl={(url) => {
             onClose();
@@ -283,8 +296,8 @@ export default function AICommandContent({
       </div>
 
       {/* Disclaimer */}
-      <div className="flex items-center justify-center gap-1.5 px-4 py-2 border-t border-amber-500/10 bg-amber-500/5 shrink-0">
-        <p className="text-[11px] text-amber-600/70 dark:text-amber-400/60">
+      <div className="flex items-center justify-center gap-1.5 px-4 py-2 border-t border-warning/10 bg-warning/5 shrink-0">
+        <p className="text-[11px] text-warning/60">
           AI can make mistakes. Review actions carefully.
         </p>
       </div>

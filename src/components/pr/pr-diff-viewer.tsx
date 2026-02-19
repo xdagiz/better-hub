@@ -233,10 +233,10 @@ export function PRDiffViewer({
           <span className="text-[11px] font-mono text-foreground font-medium">
             {files.length} file{files.length !== 1 ? "s" : ""}
           </span>
-          <span className="text-[10px] font-mono text-emerald-500">
+          <span className="text-[10px] font-mono text-success">
             +{totalAdditions}
           </span>
-          <span className="text-[10px] font-mono text-red-400">
+          <span className="text-[10px] font-mono text-destructive">
             -{totalDeletions}
           </span>
           {viewedCount > 0 && (
@@ -250,7 +250,7 @@ export function PRDiffViewer({
               className={cn(
                 "p-1 rounded transition-colors cursor-pointer",
                 sidebarMode === "files"
-                  ? "text-foreground bg-zinc-200/60 dark:bg-zinc-700/50"
+                  ? "text-foreground bg-accent"
                   : "text-muted-foreground/60 hover:text-muted-foreground"
               )}
               title="Files"
@@ -262,14 +262,14 @@ export function PRDiffViewer({
               className={cn(
                 "p-1 rounded transition-colors cursor-pointer relative",
                 sidebarMode === "reviews"
-                  ? "text-foreground bg-zinc-200/60 dark:bg-zinc-700/50"
+                  ? "text-foreground bg-accent"
                   : "text-muted-foreground/60 hover:text-muted-foreground"
               )}
               title="Reviews"
             >
               <MessageSquare className="w-3.5 h-3.5" />
               {unresolvedThreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 flex items-center justify-center text-[8px] font-mono rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 flex items-center justify-center text-[8px] font-mono rounded-full bg-warning/20 text-warning">
                   {unresolvedThreadCount}
                 </span>
               )}
@@ -279,14 +279,14 @@ export function PRDiffViewer({
               className={cn(
                 "p-1 rounded transition-colors cursor-pointer relative",
                 sidebarMode === "commits"
-                  ? "text-foreground bg-zinc-200/60 dark:bg-zinc-700/50"
+                  ? "text-foreground bg-accent"
                   : "text-muted-foreground/60 hover:text-muted-foreground"
               )}
               title="Commits"
             >
               <GitCommitHorizontal className="w-3.5 h-3.5" />
               {commits.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 flex items-center justify-center text-[8px] font-mono rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 flex items-center justify-center text-[8px] font-mono rounded-full bg-info/20 text-info">
                   {commits.length}
                 </span>
               )}
@@ -294,9 +294,9 @@ export function PRDiffViewer({
           </div>
         </div>
         {viewedCount > 0 && (
-          <div className="shrink-0 h-1 bg-zinc-200/60 dark:bg-zinc-800/60 mx-3 rounded-full overflow-hidden">
+          <div className="shrink-0 h-1 bg-border/60 mx-3 rounded-full overflow-hidden">
             <div
-              className="h-full bg-emerald-500/70 transition-all duration-300 rounded-full"
+              className="h-full bg-success/70 transition-all duration-300 rounded-full"
               style={{ width: `${(viewedCount / files.length) * 100}%` }}
             />
           </div>
@@ -322,13 +322,13 @@ export function PRDiffViewer({
                     className={cn(
                       "w-full flex items-center gap-1.5 px-3 py-1 text-left transition-colors cursor-pointer group/file",
                       activeIndex === i
-                        ? "bg-zinc-100/80 dark:bg-zinc-800/40"
-                        : "hover:bg-zinc-50/80 dark:hover:bg-zinc-800/20",
+                        ? "bg-muted/60"
+                        : "hover:bg-muted/50",
                       isViewed && "opacity-50"
                     )}
                   >
                     {isViewed ? (
-                      <Check className="w-3 h-3 shrink-0 text-emerald-500" />
+                      <Check className="w-3 h-3 shrink-0 text-success" />
                     ) : (
                       <Icon
                         className={cn(
@@ -351,12 +351,12 @@ export function PRDiffViewer({
                       )}
                     </div>
                     {fileThreads && fileThreads.length > 0 && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60 shrink-0" title={`${fileThreads.length} review thread${fileThreads.length !== 1 ? "s" : ""}`} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-warning/60 shrink-0" title={`${fileThreads.length} review thread${fileThreads.length !== 1 ? "s" : ""}`} />
                     )}
-                    <span className="text-[10px] font-mono text-emerald-500 tabular-nums shrink-0">
+                    <span className="text-[10px] font-mono text-success tabular-nums shrink-0">
                       +{file.additions}
                     </span>
-                    <span className="text-[10px] font-mono text-red-400 tabular-nums shrink-0">
+                    <span className="text-[10px] font-mono text-destructive tabular-nums shrink-0">
                       -{file.deletions}
                     </span>
                   </button>
@@ -480,8 +480,8 @@ function SingleFileDiff({
       requestAnimationFrame(() => {
         row.scrollIntoView({ behavior: "smooth", block: "center" });
         // Brief highlight
-        row.classList.add("!bg-amber-500/10");
-        setTimeout(() => row.classList.remove("!bg-amber-500/10"), 2000);
+        row.classList.add("!bg-warning/10");
+        setTimeout(() => row.classList.remove("!bg-warning/10"), 2000);
       });
     }
     onScrollComplete?.();
@@ -840,7 +840,7 @@ function SingleFileDiff({
       onMouseLeave={() => { isHoveringDiffRef.current = false; }}
     >
       {/* Sticky file header */}
-      <div className="shrink-0 sticky top-0 z-10 bg-zinc-50/95 dark:bg-zinc-900/95 backdrop-blur-sm border-b border-border">
+      <div className="shrink-0 sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center gap-2 px-3 py-1.5">
         <FileIcon
           className={cn("w-3.5 h-3.5 shrink-0", getFileIconColor(file.status))}
@@ -859,10 +859,10 @@ function SingleFileDiff({
           )}
         </span>
 
-        <span className="text-[11px] font-mono text-emerald-500 tabular-nums shrink-0">
+        <span className="text-[11px] font-mono text-success tabular-nums shrink-0">
           +{file.additions}
         </span>
-        <span className="text-[11px] font-mono text-red-400 tabular-nums shrink-0">
+        <span className="text-[11px] font-mono text-destructive tabular-nums shrink-0">
           -{file.deletions}
         </span>
 
@@ -875,8 +875,8 @@ function SingleFileDiff({
           className={cn(
             "flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] transition-colors cursor-pointer shrink-0 ml-1",
             viewed
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-zinc-200/40 dark:hover:bg-zinc-700/30"
+              ? "bg-success/10 text-success"
+              : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-accent/60"
           )}
           title={viewed ? "Mark as unreviewed" : "Mark as reviewed"}
         >
@@ -891,8 +891,8 @@ function SingleFileDiff({
           className={cn(
             "p-0.5 rounded transition-colors cursor-pointer shrink-0",
             showFullFile
-              ? "bg-zinc-200/60 dark:bg-zinc-700/50 text-foreground"
-              : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-zinc-200/40 dark:hover:bg-zinc-700/30",
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-accent/60",
             "disabled:opacity-40"
           )}
           title={showFullFile ? "Show diff only" : "Show full file"}
@@ -910,8 +910,8 @@ function SingleFileDiff({
           className={cn(
             "p-0.5 rounded transition-colors cursor-pointer shrink-0",
             wordWrap
-              ? "bg-zinc-200/60 dark:bg-zinc-700/50 text-foreground"
-              : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-zinc-200/40 dark:hover:bg-zinc-700/30"
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-accent/60"
           )}
           title={wordWrap ? "Disable word wrap" : "Enable word wrap"}
         >
@@ -923,7 +923,7 @@ function SingleFileDiff({
           <button
             onClick={onPrev}
             disabled={index === 0}
-            className="p-0.5 rounded hover:bg-zinc-200/60 dark:hover:bg-zinc-700/40 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            className="p-0.5 rounded hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
@@ -933,7 +933,7 @@ function SingleFileDiff({
           <button
             onClick={onNext}
             disabled={index === total - 1}
-            className="p-0.5 rounded hover:bg-zinc-200/60 dark:hover:bg-zinc-700/40 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            className="p-0.5 rounded hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
@@ -983,7 +983,7 @@ function SingleFileDiff({
                 className={cn(
                   "px-1 py-0.5 rounded text-[10px] font-mono font-bold transition-colors cursor-pointer",
                   matchCase
-                    ? "text-foreground bg-zinc-200/60 dark:bg-zinc-700/50"
+                    ? "text-foreground bg-accent"
                     : "text-muted-foreground/40 hover:text-foreground"
                 )}
                 title="Match case"
@@ -1230,7 +1230,7 @@ function DiffLineRow({
         {expandedContent && expandedContent.length > 0 && expandedContent.map((text, ei) => (
           <tr key={`exp-${ei}`} className="diff-expanded-context">
             <td className="w-[3px] p-0 sticky left-0 z-[1]" />
-            <td className="w-10 py-0 pr-2 text-right text-[11px] font-mono text-muted-foreground/25 select-none border-r border-zinc-200/40 dark:border-zinc-800/40 sticky left-[3px] z-[1]">
+            <td className="w-10 py-0 pr-2 text-right text-[11px] font-mono text-muted-foreground/25 select-none border-r border-border/40 sticky left-[3px] z-[1]">
               {(expandStartLine ?? 1) + ei}
             </td>
             <td className={cn(
@@ -1246,12 +1246,12 @@ function DiffLineRow({
         ))}
         <tr className="diff-hunk-header">
           <td className="w-[3px] p-0 sticky left-0 z-[1]" />
-          <td className="w-10 py-1.5 pr-2 text-right text-[11px] font-mono text-blue-400/40 select-none bg-blue-500/[0.04] dark:bg-blue-500/[0.06] border-r border-zinc-200/60 dark:border-zinc-800/60 sticky left-[3px] z-[1]">
+          <td className="w-10 py-1.5 pr-2 text-right text-[11px] font-mono text-info/40 select-none bg-info/[0.04] dark:bg-info/[0.06] border-r border-border/60 sticky left-[3px] z-[1]">
             {onExpandHunk && !expandedContent ? (
               <button
                 onClick={onExpandHunk}
                 disabled={isExpandLoading}
-                className="w-full flex items-center justify-center cursor-pointer hover:text-blue-400/70 transition-colors disabled:opacity-40"
+                className="w-full flex items-center justify-center cursor-pointer hover:text-info/70 transition-colors disabled:opacity-40"
                 title="Expand context"
               >
                 {isExpandLoading ? (
@@ -1264,8 +1264,8 @@ function DiffLineRow({
               "..."
             )}
           </td>
-          <td className="py-1.5 px-3 text-[11px] font-mono bg-blue-500/[0.04] dark:bg-blue-500/[0.06]">
-            <span className="text-blue-400/60 dark:text-blue-400/50">
+          <td className="py-1.5 px-3 text-[11px] font-mono bg-info/[0.04] dark:bg-info/[0.06]">
+            <span className="text-info/60 dark:text-info/50">
               {line.content.match(/@@ .+? @@/)?.[0]}
             </span>
             {funcName && (
@@ -1292,7 +1292,7 @@ function DiffLineRow({
           "group/line hover:brightness-95 dark:hover:brightness-110 transition-[filter] duration-75",
           isAdd && "diff-add-row",
           isDel && "diff-del-row",
-          isSelected && "!bg-zinc-500/[0.08] dark:!bg-zinc-400/[0.07]"
+          isSelected && "!bg-muted-foreground/[0.08]"
         )}
       >
         {/* Gutter bar */}
@@ -1300,11 +1300,11 @@ function DiffLineRow({
           className={cn(
             "w-[3px] p-0 sticky left-0 z-[1]",
             isSelected
-              ? "bg-zinc-400 dark:bg-zinc-500"
+              ? "bg-muted-foreground"
               : isAdd
-                ? "bg-emerald-500"
+                ? "bg-success"
                 : isDel
-                  ? "bg-red-400"
+                  ? "bg-destructive"
                   : ""
           )}
         />
@@ -1312,13 +1312,13 @@ function DiffLineRow({
         {/* Line number */}
         <td
           className={cn(
-            "w-10 py-0 pr-2 text-right text-[11px] font-mono select-none border-r border-zinc-200/40 dark:border-zinc-800/40 sticky left-[3px] z-[1] relative",
+            "w-10 py-0 pr-2 text-right text-[11px] font-mono select-none border-r border-border/40 sticky left-[3px] z-[1] relative",
             isSelected
-              ? "bg-zinc-500/[0.06] dark:bg-zinc-400/[0.06] text-zinc-500/50 dark:text-zinc-400/40"
+              ? "bg-muted-foreground/[0.06] text-muted-foreground/40"
               : isAdd
-                ? "bg-emerald-500/[0.08] dark:bg-emerald-400/[0.08] text-emerald-600/40 dark:text-emerald-400/30"
+                ? "bg-diff-add-gutter text-diff-add-gutter"
                 : isDel
-                  ? "bg-red-500/[0.10] dark:bg-red-400/[0.10] text-red-500/40 dark:text-red-400/30"
+                  ? "bg-diff-del-gutter text-diff-del-gutter"
                   : "text-muted-foreground/30"
           )}
         >
@@ -1343,8 +1343,8 @@ function DiffLineRow({
           className={cn(
             "py-0 font-mono text-[12.5px] leading-[20px]",
             wordWrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",
-            isAdd && "bg-emerald-500/[0.10] dark:bg-emerald-400/[0.09]",
-            isDel && "bg-red-500/[0.13] dark:bg-red-400/[0.11]"
+            isAdd && "bg-diff-add-bg",
+            isDel && "bg-diff-del-bg"
           )}
         >
           <div className="flex">
@@ -1352,9 +1352,9 @@ function DiffLineRow({
               className={cn(
                 "inline-block w-5 text-center shrink-0 select-none",
                 isAdd
-                  ? "text-emerald-500/50"
+                  ? "text-success/50"
                   : isDel
-                    ? "text-red-400/50"
+                    ? "text-destructive/50"
                     : "text-transparent"
               )}
             >
@@ -1378,8 +1378,8 @@ function DiffLineRow({
               ) : (
                 <span
                   className={cn(
-                    isAdd && "text-emerald-700 dark:text-emerald-300",
-                    isDel && "text-red-600 dark:text-red-300"
+                    isAdd && "text-diff-add-text",
+                    isDel && "text-diff-del-text"
                   )}
                 >
                   {line.content}
@@ -1509,9 +1509,9 @@ function InlineCommentForm({
   };
 
   return (
-    <div className="mx-3 my-1.5 max-w-xl rounded-lg border border-zinc-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-sm">
+    <div className="mx-3 my-1.5 max-w-xl rounded-lg border border-border bg-background overflow-hidden shadow-sm">
       {isMultiLine && (
-        <div className="px-3 py-1 bg-zinc-500/[0.04] dark:bg-white/[0.02] border-b border-zinc-200/40 dark:border-zinc-800">
+        <div className="px-3 py-1 bg-muted/20 border-b border-border/40">
           <span className="text-[10px] font-mono text-muted-foreground/60">
             Lines {startLine}–{line}
           </span>
@@ -1543,18 +1543,18 @@ function InlineCommentForm({
       </div>
 
       {error && (
-        <p className="text-[10px] text-red-500 px-3 pb-1">{error}</p>
+        <p className="text-[10px] text-destructive px-3 pb-1">{error}</p>
       )}
 
       {/* Bottom bar */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-t border-zinc-100 dark:border-zinc-800">
+      <div className="flex items-center gap-1 px-2 py-1.5 border-t border-border/60">
         {/* Suggest button */}
         {side === "RIGHT" && (
           <button
             onClick={handleInsertSuggestion}
             className={cn(
               "flex items-center gap-1 px-2 py-1 rounded-md text-[10px] transition-colors cursor-pointer",
-              "text-muted-foreground/50 hover:text-foreground hover:bg-zinc-200/40 dark:hover:bg-zinc-700/30"
+              "text-muted-foreground/50 hover:text-foreground hover:bg-accent/60"
             )}
             title="Suggest a code change"
           >
@@ -1576,7 +1576,7 @@ function InlineCommentForm({
             }}
             className={cn(
               "flex items-center gap-1 px-2 py-1 rounded-md text-[10px] transition-colors cursor-pointer",
-              "text-muted-foreground/50 hover:text-foreground hover:bg-zinc-200/40 dark:hover:bg-zinc-700/30"
+              "text-muted-foreground/50 hover:text-foreground hover:bg-accent/60"
             )}
             title="Add code context to Ghost"
           >
@@ -1604,7 +1604,7 @@ function InlineCommentForm({
             "flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-md text-[10px] font-medium transition-all cursor-pointer",
             body.trim()
               ? "bg-foreground text-background hover:bg-foreground/90"
-              : "bg-zinc-100 dark:bg-zinc-800/50 text-muted-foreground/40",
+              : "bg-muted text-muted-foreground/40",
             "disabled:opacity-40 disabled:cursor-not-allowed"
           )}
         >
@@ -1700,9 +1700,9 @@ function InlineCommentDisplay({
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="mx-3 my-1.5 border border-zinc-200/60 dark:border-zinc-800/50 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/30">
+    <div className="mx-3 my-1.5 border border-border rounded-lg bg-muted/40">
       <div
-        className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer select-none hover:bg-zinc-100/40 dark:hover:bg-zinc-800/20 transition-colors rounded-t-lg"
+        className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer select-none hover:bg-muted/50 transition-colors rounded-t-lg"
         onClick={() => setCollapsed((c) => !c)}
       >
         <ChevronDown
@@ -1742,20 +1742,20 @@ function InlineCommentDisplay({
                 </div>
               )}
 
-              <div className="border-y border-zinc-200/40 dark:border-zinc-800/30">
-                <div className="flex items-center gap-1.5 px-3 py-1 bg-zinc-100/50 dark:bg-zinc-800/20">
+              <div className="border-y border-border/40">
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-muted/40">
                   <Code2 className="w-3 h-3 text-muted-foreground/50" />
                   <span className="text-[10px] font-mono text-muted-foreground/60">
                     Suggested change
                   </span>
                 </div>
-                <pre className="px-3 py-2 text-[12.5px] font-mono leading-[20px] bg-emerald-500/[0.04] dark:bg-emerald-400/[0.04] text-emerald-700 dark:text-emerald-300 overflow-x-auto">
+                <pre className="px-3 py-2 text-[12.5px] font-mono leading-[20px] bg-success/[0.04] text-diff-add-text overflow-x-auto">
                   {parsed.suggestion}
                 </pre>
                 {(alreadyCommitted || result?.type === "success") ? (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/[0.06] dark:bg-emerald-400/[0.06]">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-success/[0.06]">
+                    <CheckCircle2 className="w-3 h-3 text-success" />
+                    <span className="text-[10px] font-mono text-success">
                       Suggestion committed
                     </span>
                     {isPending && (
@@ -1763,9 +1763,9 @@ function InlineCommentDisplay({
                     )}
                   </div>
                 ) : canCommit && canWrite ? (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-50/50 dark:bg-zinc-900/20">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/40">
                     {result?.type === "error" && (
-                      <span className="text-[10px] font-mono text-red-500">
+                      <span className="text-[10px] font-mono text-destructive">
                         {result.msg}
                       </span>
                     )}
@@ -1788,7 +1788,7 @@ function InlineCommentDisplay({
                       className={cn(
                         "flex items-center gap-1 px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider",
                         "border border-border",
-                        "text-foreground/70 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/40",
+                        "text-foreground/70 hover:text-foreground hover:bg-muted/60",
                         "transition-colors cursor-pointer rounded-md",
                         "disabled:opacity-40 disabled:cursor-not-allowed"
                       )}
@@ -1834,14 +1834,14 @@ function SegmentedContent({
         <span
           key={i}
           className={cn(
-            type === "add" && "text-emerald-700 dark:text-emerald-300",
-            type === "remove" && "text-red-600 dark:text-red-300",
+            type === "add" && "text-diff-add-text",
+            type === "remove" && "text-diff-del-text",
             seg.highlight &&
               type === "add" &&
-              "bg-emerald-500/25 dark:bg-emerald-400/20 rounded-[2px] px-[1px] -mx-[1px]",
+              "bg-diff-word-add rounded-[2px] px-[1px] -mx-[1px]",
             seg.highlight &&
               type === "remove" &&
-              "bg-red-500/25 dark:bg-red-400/20 rounded-[2px] px-[1px] -mx-[1px]"
+              "bg-diff-word-del rounded-[2px] px-[1px] -mx-[1px]"
           )}
         >
           {seg.text}
@@ -1912,10 +1912,10 @@ function SyntaxSegmentedContent({
           className={cn(
             r.highlight &&
               type === "add" &&
-              "bg-emerald-500/25 dark:bg-emerald-400/20 rounded-[2px] px-[1px] -mx-[1px]",
+              "bg-diff-word-add rounded-[2px] px-[1px] -mx-[1px]",
             r.highlight &&
               type === "remove" &&
-              "bg-red-500/25 dark:bg-red-400/20 rounded-[2px] px-[1px] -mx-[1px]"
+              "bg-diff-word-del rounded-[2px] px-[1px] -mx-[1px]"
           )}
           style={{ "--shiki-light": r.lightColor, "--shiki-dark": r.darkColor } as React.CSSProperties}
         >
@@ -2073,14 +2073,14 @@ function FullFileView({
           if (row.kind === "removed") {
             return (
               <tr key={`rm-${i}`} className="diff-del-row">
-                <td className="w-[3px] p-0 sticky left-0 z-[1] bg-red-400" />
-                <td className="w-10 py-0 pr-2 text-right text-[11px] font-mono text-red-500/40 dark:text-red-400/30 select-none border-r border-zinc-200/40 dark:border-zinc-800/40 sticky left-[3px] z-[1] bg-red-500/[0.10] dark:bg-red-400/[0.10]" />
+                <td className="w-[3px] p-0 sticky left-0 z-[1] bg-destructive" />
+                <td className="w-10 py-0 pr-2 text-right text-[11px] font-mono text-diff-del-gutter select-none border-r border-border/40 sticky left-[3px] z-[1] bg-diff-del-gutter" />
                 <td className={cn(
-                  "py-0 font-mono text-[12.5px] leading-[20px] bg-red-500/[0.13] dark:bg-red-400/[0.11]",
+                  "py-0 font-mono text-[12.5px] leading-[20px] bg-diff-del-bg",
                   wordWrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"
                 )}>
                   <div className="flex">
-                    <span className="inline-block w-5 text-center shrink-0 select-none text-red-400/50">-</span>
+                    <span className="inline-block w-5 text-center shrink-0 select-none text-destructive/50">-</span>
                     <span className="pl-1">
                       {row.tokens ? (
                         row.segments ? (
@@ -2095,7 +2095,7 @@ function FullFileView({
                           </span>
                         )
                       ) : (
-                        <span className="text-red-600 dark:text-red-300">{row.content}</span>
+                        <span className="text-diff-del-text">{row.content}</span>
                       )}
                     </span>
                   </div>
@@ -2109,12 +2109,12 @@ function FullFileView({
             <tr key={`ln-${i}`} className={isAdd ? "diff-add-row" : undefined}>
               <td className={cn(
                 "w-[3px] p-0 sticky left-0 z-[1]",
-                isAdd && "bg-emerald-500"
+                isAdd && "bg-success"
               )} />
               <td className={cn(
-                "w-10 py-0 pr-2 text-right text-[11px] font-mono select-none border-r border-zinc-200/40 dark:border-zinc-800/40 sticky left-[3px] z-[1]",
+                "w-10 py-0 pr-2 text-right text-[11px] font-mono select-none border-r border-border/40 sticky left-[3px] z-[1]",
                 isAdd
-                  ? "bg-emerald-500/[0.08] dark:bg-emerald-400/[0.08] text-emerald-600/40 dark:text-emerald-400/30"
+                  ? "bg-diff-add-gutter text-diff-add-gutter"
                   : "text-muted-foreground/30"
               )}>
                 {row.lineNum}
@@ -2122,12 +2122,12 @@ function FullFileView({
               <td className={cn(
                 "py-0 font-mono text-[12.5px] leading-[20px]",
                 wordWrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",
-                isAdd && "bg-emerald-500/[0.10] dark:bg-emerald-400/[0.09]"
+                isAdd && "bg-diff-add-bg"
               )}>
                 <div className="flex">
                   <span className={cn(
                     "inline-block w-5 text-center shrink-0 select-none",
-                    isAdd ? "text-emerald-500/50" : "text-transparent"
+                    isAdd ? "text-success/50" : "text-transparent"
                   )}>
                     {isAdd ? "+" : " "}
                   </span>
@@ -2145,7 +2145,7 @@ function FullFileView({
                         </span>
                       )
                     ) : (
-                      <span className={isAdd ? "text-emerald-700 dark:text-emerald-300" : ""}>
+                      <span className={isAdd ? "text-diff-add-text" : ""}>
                         {row.content}
                       </span>
                     )}
@@ -2186,12 +2186,12 @@ function SidebarCommits({
         const shortSha = c.sha.slice(0, 7);
         const message = c.commit.message.split("\n")[0];
         const date = c.commit.author?.date;
-        const commitUrl = owner && repo ? `/repos/${owner}/${repo}/commits/${c.sha}` : undefined;
+        const commitUrl = owner && repo ? `/${owner}/${repo}/commits/${c.sha}` : undefined;
 
         return (
           <div
             key={c.sha}
-            className="px-3 py-1.5 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/20 transition-colors"
+            className="px-3 py-1.5 hover:bg-muted/50 transition-colors"
           >
             <div className="flex items-start gap-1.5">
               {c.author && (
@@ -2217,7 +2217,7 @@ function SidebarCommits({
                   </span>
                 )}
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[9px] font-mono text-blue-500/70">
+                  <span className="text-[9px] font-mono text-info/70">
                     {shortSha}
                   </span>
                   {c.author && (
@@ -2338,7 +2338,7 @@ function SidebarReviews({
                 toggleFile(file.filename);
                 onNavigateToFile(index, null);
               }}
-              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left hover:bg-zinc-50/80 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left hover:bg-muted/50 transition-colors cursor-pointer"
             >
               <ChevronDown
                 className={cn(
@@ -2350,7 +2350,7 @@ function SidebarReviews({
                 {name}
               </span>
               {unresolvedCount > 0 && (
-                <span className="text-[9px] px-1 py-px rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 tabular-nums shrink-0">
+                <span className="text-[9px] px-1 py-px rounded-full bg-warning/15 text-warning tabular-nums shrink-0">
                   {unresolvedCount}
                 </span>
               )}
@@ -2370,18 +2370,18 @@ function SidebarReviews({
                       key={thread.id}
                       onClick={() => onNavigateToFile(index, thread.line)}
                       className={cn(
-                        "rounded-md border text-left transition-colors cursor-pointer hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30",
+                        "rounded-md border text-left transition-colors cursor-pointer hover:bg-muted/50",
                         thread.isResolved
-                          ? "border-zinc-200/30 dark:border-zinc-800/30 opacity-50"
-                          : "border-zinc-200/60 dark:border-zinc-800/50"
+                          ? "border-border/40 opacity-50"
+                          : "border-border"
                       )}
                     >
                       {/* Thread header */}
                       <div className="flex items-center gap-1 px-2 py-1">
                         {thread.isResolved ? (
-                          <CheckCircle2 className="w-3 h-3 shrink-0 text-emerald-500/60" />
+                          <CheckCircle2 className="w-3 h-3 shrink-0 text-success/60" />
                         ) : (
-                          <Circle className="w-3 h-3 shrink-0 text-amber-500/60" />
+                          <Circle className="w-3 h-3 shrink-0 text-warning/60" />
                         )}
                         {firstComment.author && (
                           <span className="text-[10px] font-medium text-foreground/60 truncate">
@@ -2417,8 +2417,8 @@ function SidebarReviews({
                             className={cn(
                               "text-[9px] font-mono transition-colors cursor-pointer disabled:opacity-40",
                               thread.isResolved
-                                ? "text-muted-foreground/50 hover:text-amber-500"
-                                : "text-muted-foreground/50 hover:text-emerald-500"
+                                ? "text-muted-foreground/50 hover:text-warning"
+                                : "text-muted-foreground/50 hover:text-success"
                             )}
                           >
                             {thread.isResolved ? "Unresolve" : "Resolve"}
@@ -2441,25 +2441,25 @@ function ReviewStateBadge({ state }: { state: string }) {
   switch (state) {
     case "APPROVED":
       return (
-        <span className="text-[9px] px-1.5 py-px rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+        <span className="text-[9px] px-1.5 py-px rounded-full bg-success/10 text-success font-medium">
           Approved
         </span>
       );
     case "CHANGES_REQUESTED":
       return (
-        <span className="text-[9px] px-1.5 py-px rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
+        <span className="text-[9px] px-1.5 py-px rounded-full bg-warning/10 text-warning font-medium">
           Changes
         </span>
       );
     case "COMMENTED":
       return (
-        <span className="text-[9px] px-1.5 py-px rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
+        <span className="text-[9px] px-1.5 py-px rounded-full bg-info/10 text-info font-medium">
           Commented
         </span>
       );
     case "DISMISSED":
       return (
-        <span className="text-[9px] px-1.5 py-px rounded-full bg-zinc-500/10 text-muted-foreground/60 font-medium">
+        <span className="text-[9px] px-1.5 py-px rounded-full bg-muted-foreground/10 text-muted-foreground/60 font-medium">
           Dismissed
         </span>
       );
@@ -2487,14 +2487,14 @@ function getFileIcon(status: string) {
 function getFileIconColor(status: string) {
   switch (status) {
     case "added":
-      return "text-emerald-500";
+      return "text-success";
     case "removed":
-      return "text-red-400";
+      return "text-destructive";
     case "modified":
-      return "text-amber-500";
+      return "text-warning";
     case "renamed":
     case "copied":
-      return "text-blue-400";
+      return "text-info";
     default:
       return "text-muted-foreground/60";
   }

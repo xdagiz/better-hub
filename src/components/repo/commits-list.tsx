@@ -148,7 +148,7 @@ export function CommitsList({
           <button
             onClick={clearDates}
             title="Clear date filters"
-            className="rounded-md border border-border bg-background px-2 py-2 text-xs text-muted-foreground transition-colors hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-800 cursor-pointer"
+            className="rounded-md border border-border bg-background px-2 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
           >
             ✕
           </button>
@@ -189,7 +189,7 @@ export function CommitsList({
                 >
                   {avatarUrl ? (
                     <Link
-                      href={`/repos/${login}`}
+                      href={`/${login}`}
                       className="mt-0.5 shrink-0"
                     >
                       <Image
@@ -206,15 +206,15 @@ export function CommitsList({
 
                   <div className="min-w-0 flex-1">
                     <Link
-                      href={`/repos/${owner}/${repo}/commits/${commit.sha}`}
-                      className="text-sm font-medium text-foreground hover:text-blue-600 dark:hover:text-blue-400 line-clamp-1"
+                      href={`/${owner}/${repo}/commits/${commit.sha}`}
+                      className="text-sm font-medium text-foreground hover:text-info line-clamp-1"
                     >
                       {firstLine}
                     </Link>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {login ? (
                         <Link
-                          href={`/repos/${login}`}
+                          href={`/${login}`}
                           className="hover:underline"
                         >
                           {login}
@@ -231,7 +231,7 @@ export function CommitsList({
                   <button
                     onClick={() => copySha(commit.sha)}
                     title="Copy full SHA"
-                    className="mt-0.5 shrink-0 cursor-pointer rounded px-1.5 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    className="mt-0.5 shrink-0 cursor-pointer rounded px-1.5 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted"
                   >
                     {copiedSha === commit.sha ? "Copied!" : shortSha}
                   </button>

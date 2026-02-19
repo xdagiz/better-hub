@@ -87,16 +87,16 @@ function StatChip({ label, value }: { label: string; value: number | string }) {
 
 function StateBadge({ state }: { state: string }) {
   const colors: Record<string, string> = {
-    open: "bg-green-500/15 text-green-700 dark:text-green-400",
-    closed: "bg-red-500/15 text-red-700 dark:text-red-400",
-    merged: "bg-purple-500/15 text-purple-700 dark:text-purple-400",
+    open: "bg-success/15 text-success",
+    closed: "bg-destructive/15 text-destructive",
+    merged: "bg-alert-important/15 text-alert-important",
   };
 
   return (
     <span
       className={cn(
         "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
-        colors[state] ?? "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400"
+        colors[state] ?? "bg-muted text-muted-foreground"
       )}
     >
       {state}
@@ -140,7 +140,7 @@ function ActivitySection({
               className={cn(
                 "px-1.5 py-0.5 text-[10px] font-mono rounded transition-colors",
                 period === p
-                  ? "bg-zinc-200 dark:bg-zinc-800 text-foreground"
+                  ? "bg-muted text-foreground"
                   : "text-muted-foreground/50 hover:text-muted-foreground"
               )}
             >
@@ -153,10 +153,10 @@ function ActivitySection({
       {/* Stats summary */}
       <div className="flex items-center gap-2 text-[11px] font-mono">
         <span className="text-muted-foreground">{periodCommits} commits</span>
-        <span className="text-emerald-500 dark:text-emerald-400">
+        <span className="text-success">
           +{periodAdditions.toLocaleString()}
         </span>
-        <span className="text-red-500 dark:text-red-400">
+        <span className="text-destructive">
           -{periodDeletions.toLocaleString()}
         </span>
       </div>
@@ -175,13 +175,13 @@ function ActivitySection({
                 className={cn(
                   "w-full rounded-sm transition-colors",
                   week.c > 0
-                    ? "bg-emerald-500/60 dark:bg-emerald-400/50 group-hover:bg-emerald-500 dark:group-hover:bg-emerald-400/80"
-                    : "bg-zinc-200/60 dark:bg-zinc-800/60"
+                    ? "bg-success/60 group-hover:bg-success/80"
+                    : "bg-accent"
                 )}
                 style={{ height }}
               />
               <div className="absolute bottom-full mb-1 hidden group-hover:block z-20">
-                <div className="bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-[10px] font-mono px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                <div className="bg-foreground text-background text-[10px] font-mono px-2 py-1 rounded shadow-lg whitespace-nowrap">
                   {formatWeekLabel(week.w)}: {week.c}c +{week.a} -{week.d}
                 </div>
               </div>
@@ -246,7 +246,7 @@ export function PersonDetail({
     { key: "reviews", label: "Reviews", count: activity.reviews.length },
   ];
 
-  const base = `/repos/${owner}/${repo}`;
+  const base = `/${owner}/${repo}`;
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -259,7 +259,7 @@ export function PersonDetail({
             alt={user.login}
             width={72}
             height={72}
-            className="rounded-full shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-800 ring-offset-2 ring-offset-background"
+            className="rounded-full shrink-0 ring-2 ring-border ring-offset-2 ring-offset-background"
           />
           <div className="min-w-0 space-y-1">
             <h2 className="text-xl font-semibold truncate">
@@ -297,7 +297,7 @@ export function PersonDetail({
         )}
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center gap-1 border-b border-border">
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -315,8 +315,8 @@ export function PersonDetail({
                   className={cn(
                     "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
                     tab === t.key
-                      ? "bg-zinc-200 dark:bg-zinc-800 text-foreground/70"
-                      : "bg-zinc-100 dark:bg-zinc-800/50 text-muted-foreground/60"
+                      ? "bg-muted text-foreground/70"
+                      : "bg-muted/60 text-muted-foreground/60"
                   )}
                 >
                   {t.count}
@@ -344,14 +344,14 @@ export function PersonDetail({
                     <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
                       {group.label}
                     </p>
-                    <div className="divide-y divide-zinc-200 dark:divide-zinc-800 border border-border rounded-md overflow-hidden">
+                    <div className="divide-y divide-border border border-border rounded-md overflow-hidden">
                       {group.commits.map((c) => (
                         <Link
                           key={c.sha}
                           href={`${base}/commits/${c.sha}`}
-                          className="px-4 py-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors group"
+                          className="px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors group"
                         >
-                          <span className="font-mono text-xs text-blue-600 dark:text-blue-400 shrink-0">
+                          <span className="font-mono text-xs text-info shrink-0">
                             {c.sha.slice(0, 7)}
                           </span>
                           <span className="text-sm truncate flex-1 group-hover:text-foreground">
@@ -369,7 +369,7 @@ export function PersonDetail({
 
         {/* PRs tab */}
         {tab === "prs" && (
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800 border border-border rounded-md overflow-hidden">
+          <div className="divide-y divide-border border border-border rounded-md overflow-hidden">
             {activity.prs.length === 0 ? (
               <EmptyState message="No pull requests found" />
             ) : (
@@ -377,7 +377,7 @@ export function PersonDetail({
                 <Link
                   key={pr.number}
                   href={`${base}/pulls/${pr.number}`}
-                  className="px-4 py-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors group"
+                  className="px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors group"
                 >
                   <span className="font-mono text-xs text-muted-foreground shrink-0 w-12">
                     #{pr.number}
@@ -397,7 +397,7 @@ export function PersonDetail({
 
         {/* Issues tab */}
         {tab === "issues" && (
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800 border border-border rounded-md overflow-hidden">
+          <div className="divide-y divide-border border border-border rounded-md overflow-hidden">
             {activity.issues.length === 0 ? (
               <EmptyState message="No issues found" />
             ) : (
@@ -405,7 +405,7 @@ export function PersonDetail({
                 <Link
                   key={issue.number}
                   href={`${base}/issues/${issue.number}`}
-                  className="px-4 py-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors group"
+                  className="px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors group"
                 >
                   <span className="font-mono text-xs text-muted-foreground shrink-0 w-12">
                     #{issue.number}
@@ -425,7 +425,7 @@ export function PersonDetail({
 
         {/* Reviews tab */}
         {tab === "reviews" && (
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800 border border-border rounded-md overflow-hidden">
+          <div className="divide-y divide-border border border-border rounded-md overflow-hidden">
             {activity.reviews.length === 0 ? (
               <EmptyState message="No reviews found" />
             ) : (
@@ -433,7 +433,7 @@ export function PersonDetail({
                 <Link
                   key={`${review.pr_number}-${review.submitted_at}`}
                   href={`${base}/pulls/${review.pr_number}`}
-                  className="px-4 py-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors group"
+                  className="px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors group"
                 >
                   <span className="font-mono text-xs text-muted-foreground shrink-0 w-12">
                     #{review.pr_number}

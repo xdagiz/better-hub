@@ -11,15 +11,13 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   GitPullRequest,
+  GitPullRequestClosed,
   GitMerge,
   MessageSquare,
   Clock,
   GitBranch,
   FileCode2,
   X,
-  List,
-  Columns3,
-  RefreshCw,
 } from "lucide-react";
 import type { CheckStatus } from "@/lib/github";
 import { CheckStatusBadge } from "@/components/pr/check-status-badge";
@@ -29,7 +27,6 @@ import { useClickOutside } from "@/hooks/use-click-outside";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import {
   ListSearchInput,
-  OpenClosedToggle,
   SortCycleButton,
   FiltersButton,
   ClearFiltersButton,
@@ -37,7 +34,6 @@ import {
   LoadingOverlay,
 } from "@/components/shared/list-controls";
 import { LabelBadge } from "@/components/shared/label-badge";
-import { refreshPullRequests } from "@/app/(app)/repos/[owner]/[repo]/pulls/actions";
 
 interface PRUser {
   login: string;
@@ -102,8 +98,8 @@ export function PRsList({
     author: string
   ) => Promise<{ open: PR[]; closed: PR[] }>;
 }) {
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
-  const [state, setState] = useState<"open" | "closed">("open");
+  type TabState = "open" | "merged" | "closed";
+  const [state, setState] = useState<TabState>("open");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortType>("updated");
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
@@ -116,7 +112,6 @@ export function PRsList({
     closed: PR[];
   } | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [isRefreshing, startRefreshTransition] = useTransition();
   const [showFilters, setShowFilters] = useState(false);
   const [draftFilter, setDraftFilter] = useState<DraftFilter>("all");
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
@@ -191,7 +186,22 @@ export function PRsList({
 
   const currentOpenPRs = authorPRs ? authorPRs.open : openPRs;
   const currentClosedPRs = authorPRs ? authorPRs.closed : closedPRs;
-  const basePRs = state === "open" ? currentOpenPRs : currentClosedPRs;
+
+  const mergedPRs = useMemo(
+    () => currentClosedPRs.filter((pr) => !!pr.merged_at),
+    [currentClosedPRs]
+  );
+  const closedUnmergedPRs = useMemo(
+    () => currentClosedPRs.filter((pr) => !pr.merged_at),
+    [currentClosedPRs]
+  );
+
+  const basePRs =
+    state === "open"
+      ? currentOpenPRs
+      : state === "merged"
+        ? mergedPRs
+        : closedUnmergedPRs;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -244,7 +254,7 @@ export function PRsList({
   return (
     <div>
       {/* Toolbar */}
-      <div className="sticky top-0 z-10 bg-background pb-4 pt-4 before:content-[''] before:absolute before:left-0 before:right-0 before:bottom-full before:h-8 before:bg-background">
+      <div className="sticky top-0 z-10 bg-background pb-3 pt-4 before:content-[''] before:absolute before:left-0 before:right-0 before:bottom-full before:h-8 before:bg-background">
         {/* Row 1: Search + Open/Closed + Sort */}
         <div className="flex items-center gap-2 mb-3">
           <ListSearchInput
@@ -252,46 +262,6 @@ export function PRsList({
             value={search}
             onChange={setSearch}
           />
-
-          <OpenClosedToggle
-            state={state}
-            counts={{
-              open: authorPRs ? currentOpenPRs.length : openCount,
-              closed: authorPRs ? currentClosedPRs.length : closedCount,
-            }}
-            icons={{
-              open: <GitPullRequest className="w-3 h-3" />,
-              closed: <GitMerge className="w-3 h-3" />,
-            }}
-            onStateChange={setState}
-          />
-
-          <div className="flex items-center border border-border divide-x divide-border">
-            <button
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "p-1.5 transition-colors cursor-pointer",
-                viewMode === "list"
-                  ? "bg-muted/50 dark:bg-white/4 text-foreground"
-                  : "text-muted-foreground hover:text-foreground/60"
-              )}
-              title="List view"
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setViewMode("kanban")}
-              className={cn(
-                "p-1.5 transition-colors cursor-pointer",
-                viewMode === "kanban"
-                  ? "bg-muted/50 dark:bg-white/4 text-foreground"
-                  : "text-muted-foreground hover:text-foreground/60"
-              )}
-              title="Board view"
-            >
-              <Columns3 className="w-3.5 h-3.5" />
-            </button>
-          </div>
 
           <SortCycleButton
             sort={sort}
@@ -307,19 +277,6 @@ export function PRsList({
           />
 
           <ClearFiltersButton show={activeFilterCount > 0} onClear={clearAllFilters} />
-
-          <button
-            onClick={() => {
-              startRefreshTransition(async () => {
-                await refreshPullRequests(owner, repo);
-              });
-            }}
-            disabled={isRefreshing}
-            className="p-1.5 border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/4 transition-colors cursor-pointer disabled:opacity-50"
-            title="Refresh pull requests"
-          >
-            <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
-          </button>
         </div>
 
         {/* Advanced filters panel */}
@@ -554,15 +511,41 @@ export function PRsList({
           </div>
         )}
 
-        {/* Row 2: Count */}
-        <p className="text-xs text-muted-foreground/50 font-mono mb-3">
-          Showing {filtered.length} of {authorPRs ? basePRs.length : state === "open" ? openCount : closedCount} pull requests
-        </p>
+        {/* Row 2: State tabs */}
+        <div className="flex items-center border-b border-border/40">
+          {([
+            { key: "open" as TabState, label: "Open", icon: <GitPullRequest className="w-3 h-3" />, count: authorPRs ? currentOpenPRs.length : openCount },
+            { key: "merged" as TabState, label: "Merged", icon: <GitMerge className="w-3 h-3" />, count: mergedPRs.length },
+            { key: "closed" as TabState, label: "Closed", icon: <GitPullRequestClosed className="w-3 h-3" />, count: closedUnmergedPRs.length },
+          ]).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setState(tab.key)}
+              className={cn(
+                "relative flex items-center gap-1.5 px-3 pb-2.5 pt-1 text-[12px] transition-colors cursor-pointer",
+                state === tab.key
+                  ? "text-foreground"
+                  : "text-muted-foreground/50 hover:text-foreground/70"
+              )}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className={cn(
+                "text-[10px] tabular-nums font-mono",
+                state === tab.key ? "text-foreground/50" : "text-muted-foreground/30"
+              )}>
+                {tab.count}
+              </span>
+              {state === tab.key && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {viewMode === "list" ? (
-        /* PR List */
-        <div className="relative flex-1 min-h-0 overflow-y-auto border border-border divide-y divide-border">
+      {/* PR List */}
+      <div className="relative flex-1 min-h-0 overflow-y-auto border border-border divide-y divide-border">
           <LoadingOverlay show={isPending} />
           {visible.map((pr) => {
             const isMerged = !!pr.merged_at;
@@ -571,17 +554,17 @@ export function PRsList({
             return (
               <Link
                 key={pr.id}
-                href={`/repos/${owner}/${repo}/pulls/${pr.number}`}
+                href={`/${owner}/${repo}/pulls/${pr.number}`}
                 className="group flex items-start gap-3 px-4 py-3 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors"
               >
                 <GitPullRequest
                   className={cn(
                     "w-3.5 h-3.5 shrink-0 mt-0.5",
                     isMerged
-                      ? "text-purple-400"
+                      ? "text-alert-important"
                       : pr.draft
                         ? "text-muted-foreground/70"
-                        : "text-emerald-500"
+                        : "text-success"
                   )}
                 />
                 <div className="flex-1 min-w-0">
@@ -590,7 +573,7 @@ export function PRsList({
                       {pr.title}
                     </span>
                     {pr.draft && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-500/10 text-muted-foreground/70 shrink-0">
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-muted-foreground/10 text-muted-foreground/70 shrink-0">
                         Draft
                       </span>
                     )}
@@ -609,7 +592,7 @@ export function PRsList({
                             alt={r.login}
                             width={16}
                             height={16}
-                            className="rounded-full border border-zinc-200 dark:border-zinc-800"
+                            className="rounded-full border border-border"
                             title={`Review requested: ${r.login}`}
                           />
                         ))}
@@ -659,10 +642,10 @@ export function PRsList({
                         {totalComments}
                       </span>
                     )}
-                    <span className="font-mono text-emerald-500 text-[10px]">
+                    <span className="font-mono text-success text-[10px]">
                       +{pr.additions ?? 0}
                     </span>
-                    <span className="font-mono text-red-400 text-[10px]">
+                    <span className="font-mono text-destructive text-[10px]">
                       -{pr.deletions ?? 0}
                     </span>
                     <span className="flex items-center gap-1 font-mono text-muted-foreground/40 text-[10px]">
@@ -679,7 +662,7 @@ export function PRsList({
                             alt={a.login}
                             width={16}
                             height={16}
-                            className="rounded-full border border-zinc-200 dark:border-zinc-800"
+                            className="rounded-full border border-border"
                             title={`Assignee: ${a.login}`}
                           />
                         ))}
@@ -700,252 +683,17 @@ export function PRsList({
 
           {filtered.length === 0 && (
             <div className="py-16 text-center">
-              <GitPullRequest className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+              <GitPullRequest className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-xs text-muted-foreground font-mono">
                 {search || activeFilterCount > 0
                   ? "No pull requests match your filters"
-                  : `No ${state} pull requests`}
+                  : state === "merged"
+                    ? "No merged pull requests"
+                    : `No ${state} pull requests`}
               </p>
             </div>
           )}
         </div>
-      ) : (
-        <KanbanBoard
-          allPRs={[...currentOpenPRs, ...currentClosedPRs]}
-          owner={owner}
-          repo={repo}
-          search={search}
-          selectedAuthor={selectedAuthor}
-          selectedLabel={selectedLabel}
-          draftFilter={draftFilter}
-          reviewFilter={reviewFilter}
-          assigneeFilter={assigneeFilter}
-          selectedBranch={selectedBranch}
-          authorPRs={authorPRs}
-        />
-      )}
-    </div>
-  );
-}
-
-type KanbanColumn = "draft" | "ready" | "reviewed" | "merged" | "closed";
-
-const columnConfig: { key: KanbanColumn; label: string; color: string; dot: string; icon: typeof GitPullRequest }[] = [
-  { key: "draft", label: "Draft", color: "text-muted-foreground", dot: "bg-zinc-400", icon: GitPullRequest },
-  { key: "ready", label: "Open", color: "text-emerald-500", dot: "bg-emerald-500", icon: GitPullRequest },
-  { key: "reviewed", label: "Reviewed", color: "text-blue-400", dot: "bg-blue-400", icon: MessageSquare },
-  { key: "merged", label: "Merged", color: "text-purple-400", dot: "bg-purple-400", icon: GitMerge },
-  { key: "closed", label: "Closed", color: "text-red-400", dot: "bg-red-400", icon: GitPullRequest },
-];
-
-function categorizePR(pr: PR): KanbanColumn {
-  if (pr.merged_at) return "merged";
-  if (pr.state === "closed") return "closed";
-  if (pr.draft) return "draft";
-  if ((pr.review_comments ?? 0) > 0) return "reviewed";
-  return "ready";
-}
-
-function KanbanBoard({
-  allPRs,
-  owner,
-  repo,
-  search,
-  selectedAuthor,
-  selectedLabel,
-  draftFilter,
-  reviewFilter,
-  assigneeFilter,
-  selectedBranch,
-  authorPRs,
-}: {
-  allPRs: PR[];
-  owner: string;
-  repo: string;
-  search: string;
-  selectedAuthor: string | null;
-  selectedLabel: string | null;
-  draftFilter: DraftFilter;
-  reviewFilter: ReviewFilter;
-  assigneeFilter: AssigneeFilter;
-  selectedBranch: string | null;
-  authorPRs: { open: PR[]; closed: PR[] } | null;
-}) {
-  const [hiddenColumns, setHiddenColumns] = useState<Set<KanbanColumn>>(
-    new Set(["merged", "closed"])
-  );
-
-  const toggleColumn = (col: KanbanColumn) => {
-    setHiddenColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(col)) next.delete(col);
-      else next.add(col);
-      return next;
-    });
-  };
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return allPRs.filter((pr) => {
-      if (q) {
-        const matchesSearch =
-          pr.title.toLowerCase().includes(q) ||
-          pr.user?.login.toLowerCase().includes(q) ||
-          (pr.head?.ref?.toLowerCase().includes(q) ?? false) ||
-          (pr.base?.ref?.toLowerCase().includes(q) ?? false) ||
-          pr.labels.some((l) => l.name?.toLowerCase().includes(q));
-        if (!matchesSearch) return false;
-      }
-      if (!authorPRs && selectedAuthor && pr.user?.login !== selectedAuthor) return false;
-      if (selectedLabel && !pr.labels.some((l) => l.name === selectedLabel)) return false;
-      if (draftFilter === "ready" && pr.draft) return false;
-      if (draftFilter === "draft" && !pr.draft) return false;
-      if (reviewFilter === "has_reviewers" && (pr.requested_reviewers?.length ?? 0) === 0) return false;
-      if (reviewFilter === "no_reviewers" && (pr.requested_reviewers?.length ?? 0) > 0) return false;
-      if (assigneeFilter === "assigned" && (pr.assignees?.length ?? 0) === 0) return false;
-      if (assigneeFilter === "unassigned" && (pr.assignees?.length ?? 0) > 0) return false;
-      if (selectedBranch && pr.base?.ref !== selectedBranch) return false;
-      return true;
-    });
-  }, [allPRs, search, selectedAuthor, selectedLabel, draftFilter, reviewFilter, assigneeFilter, selectedBranch, authorPRs]);
-
-  const columns = useMemo(() => {
-    const map: Record<KanbanColumn, PR[]> = {
-      draft: [],
-      ready: [],
-      reviewed: [],
-      merged: [],
-      closed: [],
-    };
-    for (const pr of filtered) {
-      map[categorizePR(pr)].push(pr);
-    }
-    return map;
-  }, [filtered]);
-
-  const visibleColumns = columnConfig.filter((c) => !hiddenColumns.has(c.key));
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* Column visibility */}
-      <div className="flex items-center gap-1 mb-3 shrink-0">
-        {columnConfig.map((col) => {
-          const hidden = hiddenColumns.has(col.key);
-          const count = columns[col.key].length;
-          return (
-            <button
-              key={col.key}
-              onClick={() => toggleColumn(col.key)}
-              className={cn(
-                "flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono rounded-md transition-colors cursor-pointer",
-                !hidden
-                  ? "text-foreground bg-muted/40 dark:bg-white/[0.04]"
-                  : "text-muted-foreground/40 hover:text-muted-foreground/70"
-              )}
-            >
-              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", hidden ? "bg-zinc-300 dark:bg-zinc-700" : col.dot)} />
-              {col.label}
-              {count > 0 && (
-                <span className={cn("tabular-nums", hidden ? "text-muted-foreground/30" : "text-muted-foreground/50")}>
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Columns */}
-      <div className="flex gap-2.5 flex-1 min-h-0 pb-2">
-        {visibleColumns.map((col) => {
-          const prs = columns[col.key];
-          return (
-            <div
-              key={col.key}
-              className="flex flex-col flex-1 min-w-0 rounded-lg bg-muted/20 dark:bg-white/[0.015]"
-            >
-              {/* Header */}
-              <div className="flex items-center gap-2 px-3 py-2.5 shrink-0">
-                <span className={cn("w-2 h-2 rounded-full shrink-0", col.dot)} />
-                <span className="text-[11px] font-mono font-medium truncate">
-                  {col.label}
-                </span>
-                <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums ml-auto">
-                  {prs.length}
-                </span>
-              </div>
-
-              {/* Cards */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-1.5 pb-1.5 space-y-1.5">
-                {prs.length > 0 ? (
-                  prs.map((pr) => {
-                    const totalComments = (pr.comments ?? 0) + (pr.review_comments ?? 0);
-                    const hasLabels = pr.labels.filter((l) => l.name).length > 0;
-
-                    return (
-                      <Link
-                        key={pr.id}
-                        href={`/repos/${owner}/${repo}/pulls/${pr.number}`}
-                        className="group block px-3 py-2.5 bg-background rounded-md border border-zinc-200/60 dark:border-zinc-800/60 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
-                      >
-                        {/* Title */}
-                        <p className="text-xs leading-snug group-hover:text-foreground transition-colors line-clamp-2">
-                          {pr.title}
-                        </p>
-
-                        {/* Labels */}
-                        {hasLabels && (
-                          <div className="flex items-center gap-1 mt-2 flex-wrap">
-                            {pr.labels
-                              .filter((l) => l.name)
-                              .slice(0, 2)
-                              .map((label) => (
-                                <LabelBadge key={label.name} label={label} />
-                              ))}
-                          </div>
-                        )}
-
-                        {/* Footer */}
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-[10px] font-mono text-muted-foreground/40">
-                            #{pr.number}
-                          </span>
-                          {pr.user && (
-                            <Image
-                              src={pr.user.avatar_url}
-                              alt={pr.user.login}
-                              width={16}
-                              height={16}
-                              className="rounded-full"
-                              title={pr.user.login}
-                            />
-                          )}
-                          <span className="flex-1" />
-                          {totalComments > 0 && (
-                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/40">
-                              <MessageSquare className="w-2.5 h-2.5" />
-                              {totalComments}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-muted-foreground/40 font-mono">
-                            <TimeAgo date={pr.created_at} />
-                          </span>
-                        </div>
-                      </Link>
-                    );
-                  })
-                ) : (
-                  <div className="py-10 text-center">
-                    <p className="text-[10px] text-muted-foreground/30 font-mono">
-                      Empty
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
