@@ -10,6 +10,7 @@ import {
   Star,
   X,
 } from "lucide-react";
+import type { ComponentProps } from "react";
 import ReactMarkdown from "react-markdown";
 import { cn, formatNumber } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
@@ -688,7 +689,7 @@ export function AIMarkdown({ children }: { children: string }) {
 
 // ─── Main AICommandResults component ──────────────────────────────────────────
 
-type AIMessage = {
+export type AIMessage = {
   id: string;
   role: "user" | "assistant" | "system";
   parts: Array<{
@@ -852,7 +853,7 @@ export function AICommandResults({
                 if (part.type.startsWith("tool-")) {
                   const toolName = part.type.replace("tool-", "");
                   const state = part.state;
-                  const output = part.output as Record<string, unknown> | undefined;
+                  const output = part.output as Record<string, unknown>;
 
                   if (
                     state === "input-available" ||
@@ -881,7 +882,7 @@ export function AICommandResults({
                       return (
                         <RepoSearchResults
                           key={index}
-                          output={output as any}
+                          output={output as ComponentProps<typeof RepoSearchResults>["output"]}
                           onNavigate={onNavigateRepo}
                         />
                       );
@@ -890,7 +891,7 @@ export function AICommandResults({
                       return (
                         <UserSearchResults
                           key={index}
-                          output={output as any}
+                          output={output as ComponentProps<typeof UserSearchResults>["output"]}
                           onOpenUrl={onOpenUrl}
                         />
                       );
@@ -899,7 +900,7 @@ export function AICommandResults({
                       return (
                         <RepoInfoCard
                           key={index}
-                          output={output as any}
+                          output={output as ComponentProps<typeof RepoInfoCard>["output"]}
                           onNavigate={onNavigateRepo}
                         />
                       );
@@ -908,7 +909,7 @@ export function AICommandResults({
                       return (
                         <UserProfileCard
                           key={index}
-                          output={output as any}
+                          output={output as unknown as ComponentProps<typeof UserProfileCard>["output"]}
                           onOpenUrl={onOpenUrl}
                         />
                       );
@@ -917,7 +918,7 @@ export function AICommandResults({
                       return (
                         <IssueListResults
                           key={index}
-                          output={output as any}
+                          output={output as ComponentProps<typeof IssueListResults>["output"]}
                         />
                       );
                     }
@@ -925,7 +926,7 @@ export function AICommandResults({
                       return (
                         <PRListResults
                           key={index}
-                          output={output as any}
+                          output={output as ComponentProps<typeof PRListResults>["output"]}
                         />
                       );
                     }
@@ -933,7 +934,7 @@ export function AICommandResults({
                       return (
                         <NotificationListResults
                           key={index}
-                          output={output as any}
+                          output={output as ComponentProps<typeof NotificationListResults>["output"]}
                         />
                       );
                     }
@@ -945,7 +946,7 @@ export function AICommandResults({
                     return (
                       <ActionResult
                         key={index}
-                        output={output as any}
+                        output={output as ComponentProps<typeof ActionResult>["output"]}
                       />
                     );
                   }

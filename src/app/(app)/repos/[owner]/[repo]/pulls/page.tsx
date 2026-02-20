@@ -19,7 +19,7 @@ export default async function PullsListPage({
   const allPRs = [...openPRs, ...closedPRs];
   const [statsMap, checkStatusMap] = await Promise.all([
     enrichPRsWithStats(owner, repo, allPRs),
-    enrichPRsWithCheckStatus(owner, repo, openPRs as any),
+    enrichPRsWithCheckStatus(owner, repo, openPRs),
   ]);
 
   const enrich = (prs: typeof openPRs) =>
@@ -33,11 +33,11 @@ export default async function PullsListPage({
     <PRsList
       owner={owner}
       repo={repo}
-      openPRs={enrich(openPRs) as any}
-      closedPRs={enrich(closedPRs) as any}
+      openPRs={enrich(openPRs) as unknown as Parameters<typeof PRsList>[0]["openPRs"]}
+      closedPRs={enrich(closedPRs) as unknown as Parameters<typeof PRsList>[0]["closedPRs"]}
       openCount={openCount.total_count}
       closedCount={closedCount.total_count}
-      onAuthorFilter={fetchPRsByAuthor as any}
+      onAuthorFilter={fetchPRsByAuthor as unknown as Parameters<typeof PRsList>[0]["onAuthorFilter"]}
     />
   );
 }

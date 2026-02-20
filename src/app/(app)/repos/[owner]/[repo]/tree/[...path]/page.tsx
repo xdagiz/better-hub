@@ -21,7 +21,7 @@ export default async function TreePage({
   const contents = await getRepoContents(owner, repo, path, ref);
 
   const items = Array.isArray(contents)
-    ? contents.map((item: any) => ({
+    ? contents.map((item) => ({
         name: item.name,
         path: item.path,
         type: item.type === "dir" ? ("dir" as const) : ("file" as const),

@@ -195,7 +195,7 @@ function buildGitHubTools(octokit: Octokit, owner: string, repo: string, promptR
           const { data: newTree } = await octokit.git.createTree({
             owner, repo,
             base_tree: baseTreeSha,
-            tree: treeEntries as { path: string; mode: string; type: string; sha: string | null }[],
+            tree: treeEntries,
           });
 
           const { data: newCommit } = await octokit.git.createCommit({

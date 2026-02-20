@@ -26,8 +26,8 @@ export default async function CompareRunsPage({
   }
 
   const repoData = await getRepo(owner, repo);
-  const avatarUrl = (repoData as any)?.owner?.avatar_url ?? null;
-  const description = (repoData as any)?.description ?? null;
+  const avatarUrl = repoData?.owner?.avatar_url ?? null;
+  const description = repoData?.description ?? null;
 
   return (
     <RunComparisonPage

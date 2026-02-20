@@ -2,7 +2,7 @@ export function LabelBadge({
   label,
   maxWidth,
 }: {
-  label: { name?: string; color?: string };
+  label: { name?: string; color?: string | null };
   maxWidth?: number;
 }) {
   if (!label.name) return null;

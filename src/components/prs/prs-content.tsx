@@ -32,7 +32,7 @@ interface IssueItem {
   user: { login: string; avatar_url: string } | null;
   labels: Array<{ name?: string; color?: string }>;
   draft?: boolean;
-  pull_request?: { merged_at: string | null };
+  pull_request?: { merged_at?: string | null };
   comments: number;
 }
 

@@ -16,14 +16,14 @@ export default async function ActionsPage({
     getRepoWorkflowRuns(owner, repo),
   ]);
 
-  const runsArray = (runs as any) ?? [];
+  const runsArray = runs ?? [];
 
   return (
     <ActionsList
       owner={owner}
       repo={repo}
-      workflows={workflows as any}
-      runs={runsArray}
+      workflows={workflows as Parameters<typeof ActionsList>[0]["workflows"]}
+      runs={runsArray as Parameters<typeof ActionsList>[0]["runs"]}
       initialTotalCount={runsArray.length}
       initialWorkflow={sp.workflow}
     />

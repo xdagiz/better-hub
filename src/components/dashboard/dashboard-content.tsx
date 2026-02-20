@@ -70,6 +70,8 @@ interface ActivityEvent {
     issue?: { title: string; number: number };
     comment?: { body: string };
     size?: number;
+    release?: { tag_name?: string; name?: string };
+    member?: { login?: string };
   };
 }
 
@@ -659,7 +661,7 @@ function getMarqueeItem(event: ActivityEvent): { icon: React.ReactNode; text: st
   const time = event.created_at
     ? new Date(event.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: false })
     : "";
-  const p = (event as any).payload ?? {};
+  const p = event.payload;
 
   switch (event.type) {
     case "PushEvent": {

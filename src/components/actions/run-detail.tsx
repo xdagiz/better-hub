@@ -18,7 +18,7 @@ import { StatusIcon } from "./status-icon";
 
 interface WorkflowRun {
   id: number;
-  name: string;
+  name?: string | null;
   display_title: string;
   run_number: number;
   status: string | null;
@@ -38,8 +38,8 @@ interface Step {
   status: string;
   conclusion: string | null;
   number: number;
-  started_at: string | null;
-  completed_at: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
 }
 
 interface Job {
@@ -386,7 +386,7 @@ export function RunDetail({
                           <span className="text-[10px] font-mono text-muted-foreground/40 shrink-0">
                             {formatDuration(
                               step.started_at,
-                              step.completed_at
+                              step.completed_at ?? null
                             )}
                           </span>
                         )}

@@ -43,8 +43,20 @@ const LANG_COLORS: Record<string, string> = {
   Makefile: "#427819",
 };
 
+interface RepoPulseData {
+  stargazers_count?: number;
+  forks_count?: number;
+  subscribers_count?: number;
+  watchers_count?: number;
+  open_issues_count?: number;
+  size?: number;
+  created_at?: string;
+  pushed_at?: string;
+  language?: string | null;
+}
+
 interface InsightsViewProps {
-  repo: any;
+  repo: RepoPulseData;
   commitActivity: CommitActivityWeek[];
   codeFrequency: CodeFrequencyWeek[];
   participation: WeeklyParticipation | null;
@@ -124,7 +136,7 @@ function EmptyState({ message }: { message: string }) {
 }
 
 // --- Pulse Section ---
-function PulseSection({ repo }: { repo: any }) {
+function PulseSection({ repo }: { repo: RepoPulseData }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
       <Stat label="Stars" value={formatNumber(repo.stargazers_count ?? 0)} />

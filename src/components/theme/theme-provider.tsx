@@ -91,7 +91,7 @@ export function ColorThemeProvider({ children }: { children: React.ReactNode }) 
 
     // Smooth crossfade via View Transitions API
     if (typeof document !== "undefined" && "startViewTransition" in document) {
-      (document as any).startViewTransition(apply);
+      (document as unknown as { startViewTransition: (cb: () => void) => void }).startViewTransition(apply);
     } else {
       apply();
     }

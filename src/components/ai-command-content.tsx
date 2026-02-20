@@ -5,7 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowUp, Square } from "lucide-react";
-import { AICommandResults } from "@/components/ai-command-results";
+import { AICommandResults, type AIMessage } from "@/components/ai-command-results";
 import { AgentIcon } from "@/components/ui/agent-icon";
 
 /** Known top-level app routes that are NOT owner/repo paths */
@@ -277,7 +277,7 @@ export default function AICommandContent({
         className="overflow-y-auto flex-1 min-h-0"
       >
         <AICommandResults
-          messages={aiMessages as any}
+          messages={aiMessages as AIMessage[]}
           isStreaming={isAiStreaming}
           error={aiError}
           onQuickReply={(text) => {

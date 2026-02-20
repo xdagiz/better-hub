@@ -126,8 +126,14 @@ function CopyButton({ text }: { text: string }) {
 /** Custom markdown components for Ghost AI responses.
  *  Rewrites github.com links to internal app routes.
  *  Adds copy button on code blocks and inline code. */
+interface HastElement {
+  tagName?: string;
+  properties?: { className?: string[] };
+  children?: HastElement[];
+}
+
 const ghostMarkdownComponents = {
-  pre: ({ children, node, ...props }: React.HTMLAttributes<HTMLPreElement> & { node?: any }) => {
+  pre: ({ children, node, ...props }: React.HTMLAttributes<HTMLPreElement> & { node?: HastElement }) => {
     // Extract text content from the <code> child
     let codeText = "";
     const child = Array.isArray(children) ? children[0] : children;
@@ -137,13 +143,14 @@ const ghostMarkdownComponents = {
         codeText = codeChildren;
       } else if (Array.isArray(codeChildren)) {
         codeText = codeChildren
-          .map((c: any) => (typeof c === "string" ? c : ""))
+          .map((c: unknown) => (typeof c === "string" ? c : ""))
           .join("");
       }
     }
     // If child code has a language class, HighlightedCodeBlock handles its own wrapper
-    const codeChild = (node?.children as any[])?.find(
-      (c: any) => c.tagName === "code"
+    const nodeChildren = (node?.children ?? []) as HastElement[];
+    const codeChild = nodeChildren.find(
+      (c) => c.tagName === "code"
     );
     const hasLang = codeChild?.properties?.className?.some?.(
       (c: string) => typeof c === "string" && c.startsWith("language-")
@@ -249,7 +256,7 @@ function formatRelativeTime(dateStr: string): string {
 
 interface AIChatProps {
   apiEndpoint: string;
-  contextBody: Record<string, any>;
+  contextBody: Record<string, unknown>;
   contextKey: string;
   /** When provided, messages are persisted to the DB via /api/ai/chat-history */
   persistKey?: string;
@@ -531,7 +538,7 @@ export function AIChat({
         if (cancelled) return;
         if (data.conversation && data.messages && data.messages.length > 0) {
           setConversationId(data.conversation.id);
-          const uiMessages: UIMessage[] = data.messages.map((m: any) => ({
+          const uiMessages: UIMessage[] = data.messages.map((m: { id: string; role: "user" | "assistant" | "system"; content: string }) => ({
             id: m.id,
             role: m.role,
             content: m.content,
@@ -567,7 +574,7 @@ export function AIChat({
     for (const msg of newMessages) {
       const text = msg.parts
         ?.filter((p) => p.type === "text")
-        .map((p) => (p as any).text)
+        .map((p) => (p as { type: "text"; text: string }).text)
         .join("") || "";
       if (!text) continue;
 
@@ -1014,12 +1021,12 @@ export function AIChat({
                       if (part.type === "text" && part.text) {
                         return (
                           <div key={i} className="ghmd ghmd-ai">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={ghostMarkdownComponents}>{part.text}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={ghostMarkdownComponents as Parameters<typeof ReactMarkdown>[0]["components"]}>{part.text}</ReactMarkdown>
                           </div>
                         );
                       }
                       if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
-                        const p = part as any;
+                        const p = part as { type: string; toolName?: string; state?: string; input?: Record<string, unknown>; output?: unknown };
                         const toolName = part.type === "dynamic-tool" ? p.toolName : part.type.replace("tool-", "");
                         // Hide background tools from UI
                         if (toolName === "refreshPage") return null;
@@ -1029,7 +1036,7 @@ export function AIChat({
                             toolName={toolName}
                             state={p.state}
                             args={p.input}
-                            result={p.output}
+                            result={p.output as ToolPayload | undefined}
                             onStop={stop}
                           />
                         );
@@ -1333,6 +1340,10 @@ export function AIChat({
   );
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- tool invocation payloads have dynamic runtime shapes */
+type ToolPayload = Record<string, any>;
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 export function ToolInvocationDisplay({
   toolName,
   state,
@@ -1340,10 +1351,10 @@ export function ToolInvocationDisplay({
   result,
   onStop,
 }: {
-  toolName: string;
-  state: string;
-  args: any;
-  result?: any;
+  toolName?: string;
+  state?: string;
+  args?: ToolPayload;
+  result?: ToolPayload;
   onStop?: () => void;
 }) {
   const isLoading = state === "input-streaming" || state === "input-available";
@@ -1630,10 +1641,10 @@ export function ToolInvocationDisplay({
     },
   };
 
-  const c = config[toolName] || {
+  const c = (toolName && config[toolName]) || {
     icon: FileSearch,
-    loadingText: `Running ${toolName}...`,
-    doneText: `Completed ${toolName}`,
+    loadingText: `Running ${toolName ?? "tool"}...`,
+    doneText: `Completed ${toolName ?? "tool"}`,
   };
 
   const Icon = c.icon;

@@ -23,7 +23,7 @@ export default async function PersonPage({
     <PersonDetail
       owner={owner}
       repo={repo}
-      user={user as any}
+      user={user}
       activity={activity}
       weeklyData={weeklyData}
     />

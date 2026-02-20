@@ -13,7 +13,7 @@ import {
   X,
   Keyboard,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import type { MergeHunk, ConflictFileData } from "@/lib/three-way-merge";
 import { commitMergeConflictResolution } from "@/app/(app)/repos/[owner]/[repo]/pulls/pr-actions";
 
@@ -110,8 +110,8 @@ export function PRConflictResolver({
         setResolutions(map);
         setActiveFile(firstConflictFile || json.files[0]?.path || null);
         setCommitMessage(`Merge branch '${json.baseBranch}' into ${json.headBranch}`);
-      } catch (e: any) {
-        setError(e.message || "Failed to load conflicts");
+      } catch (e: unknown) {
+        setError(getErrorMessage(e) || "Failed to load conflicts");
       } finally {
         setLoading(false);
       }

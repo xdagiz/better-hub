@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { Logo } from "@/components/ui/logo";
 import { HalftoneBackground } from "@/components/ui/halftone-background";
 import { AgentIcon } from "@/components/ui/agent-icon";
 
@@ -71,7 +70,7 @@ export default function LoginPage() {
         {/* Branding overlay */}
         <div className="relative z-10 flex flex-col justify-end p-10 w-full h-full gap-8">
           <div className="absolute top-10 left-10">
-            <Logo className="h-3.5 text-foreground/60" />
+            <Image src="/logo.svg" alt="Better Hub" width={45} height={45} className="rounded-md" />
           </div>
 
           <div className="max-w-md">
@@ -182,7 +181,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden mb-12">
-            <Logo className="h-3.5 text-foreground/60" />
+            <Image src="/logo.svg" alt="Better Hub" width={28} height={28} className="rounded-md" />
           </div>
 
           <div className="mb-5">

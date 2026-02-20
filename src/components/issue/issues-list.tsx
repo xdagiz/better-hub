@@ -58,7 +58,7 @@ interface Issue {
   closed_at: string | null;
   comments: number;
   user: IssueUser | null;
-  labels: Array<{ name?: string; color?: string }>;
+  labels: Array<string | { name?: string; color?: string | null }>;
   assignees: IssueUser[];
   milestone: { title: string } | null;
   reactions: { total_count: number; "+1": number };
@@ -169,11 +169,10 @@ export function IssuesList({
     const seen = new Map<string, { name: string; color: string }>();
     for (const issue of allIssues) {
       for (const label of issue.labels) {
-        if (label.name && !seen.has(label.name)) {
-          seen.set(label.name, {
-            name: label.name,
-            color: label.color || "888",
-          });
+        const name = typeof label === "string" ? label : label.name;
+        const color = typeof label === "string" ? "888" : (label.color || "888");
+        if (name && !seen.has(name)) {
+          seen.set(name, { name, color });
         }
       }
     }
@@ -239,7 +238,7 @@ export function IssuesList({
             matchesNumber ||
             issue.title.toLowerCase().includes(q) ||
             issue.user?.login.toLowerCase().includes(q) ||
-            issue.labels.some((l) => l.name?.toLowerCase().includes(q)) ||
+            issue.labels.some((l) => (typeof l === "string" ? l : l.name)?.toLowerCase().includes(q)) ||
             (issue.milestone?.title?.toLowerCase().includes(q) ?? false);
           if (!matchesSearch) return false;
         }
@@ -251,7 +250,7 @@ export function IssuesList({
           return false;
         if (
           selectedLabel &&
-          !issue.labels.some((l) => l.name === selectedLabel)
+          !issue.labels.some((l) => (typeof l === "string" ? l : l.name) === selectedLabel)
         )
           return false;
         if (
@@ -761,6 +760,7 @@ export function IssuesList({
                     </span>
                   )}
                   {issue.labels
+                    .map((l) => typeof l === "string" ? { name: l, color: "888" } : l)
                     .filter((l) => l.name)
                     .slice(0, 3)
                     .map((label) => (

@@ -15,7 +15,7 @@ import {
   AlertCircle,
   Ghost,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { ClientMarkdown } from "@/components/shared/client-markdown";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { useGlobalChat } from "@/components/shared/global-chat-provider";
@@ -167,8 +167,8 @@ export function PromptDetail({ owner, repo, promptRequest }: PromptDetailProps) 
       await acceptPromptRequest(promptRequest.id);
       router.refresh();
       openGhostWithPrompt();
-    } catch (e: any) {
-      setError(e.message || "Failed to accept");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || "Failed to accept");
       setIsAccepting(false);
     }
   };

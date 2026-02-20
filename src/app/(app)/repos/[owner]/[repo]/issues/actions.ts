@@ -1,6 +1,7 @@
 "use server";
 
 import { getOctokit, invalidateRepoIssuesCache } from "@/lib/github";
+import { getErrorMessage } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
 export async function fetchIssuesByAuthor(
@@ -57,7 +58,7 @@ export async function getIssueTemplates(
     if (!Array.isArray(contents)) return [];
 
     const mdFiles = contents.filter(
-      (f: any) =>
+      (f) =>
         f.type === "file" &&
         (f.name.endsWith(".md") || f.name.endsWith(".yml") || f.name.endsWith(".yaml"))
     );
@@ -199,10 +200,10 @@ export async function createIssue(
     await invalidateRepoIssuesCache(owner, repo);
     revalidatePath(`/repos/${owner}/${repo}/issues`);
     return { success: true, number: data.number };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       success: false,
-      error: err?.message || "Failed to create issue",
+      error: getErrorMessage(err),
     };
   }
 }

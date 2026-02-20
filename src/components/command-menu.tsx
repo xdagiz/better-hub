@@ -421,7 +421,7 @@ export function CommandMenu() {
         const res = await fetch(`/api/search-repos?${params}`);
         if (res.ok) {
           const data = await res.json();
-          const items = (data.items ?? []).map((r: any) => ({
+          const items = (data.items ?? []).map((r: { id: number; full_name: string; description?: string | null; language?: string | null; stargazers_count?: number; owner?: { login: string; avatar_url: string } | null }) => ({
             id: r.id,
             full_name: r.full_name,
             description: r.description ?? null,

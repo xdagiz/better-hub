@@ -1,6 +1,7 @@
 "use server";
 
 import { getOctokit, invalidateIssueCache } from "@/lib/github";
+import { getErrorMessage } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
 export async function addIssueComment(
@@ -22,8 +23,8 @@ export async function addIssueComment(
     await invalidateIssueCache(owner, repo, issueNumber);
     revalidatePath(`/repos/${owner}/${repo}/issues/${issueNumber}`);
     return { success: true };
-  } catch (e: any) {
-    return { error: e.message || "Failed to add comment" };
+  } catch (e: unknown) {
+    return { error: getErrorMessage(e) };
   }
 }
 
@@ -46,7 +47,7 @@ export async function closeIssue(
         body: comment.trim(),
       });
     }
-    await (octokit.issues.update as any)({
+    await octokit.issues.update({
       owner,
       repo,
       issue_number: issueNumber,
@@ -57,8 +58,8 @@ export async function closeIssue(
     revalidatePath(`/repos/${owner}/${repo}/issues/${issueNumber}`);
     revalidatePath(`/repos/${owner}/${repo}/issues`);
     return { success: true };
-  } catch (e: any) {
-    return { error: e.message || "Failed to close issue" };
+  } catch (e: unknown) {
+    return { error: getErrorMessage(e) };
   }
 }
 
@@ -90,7 +91,7 @@ export async function reopenIssue(
     revalidatePath(`/repos/${owner}/${repo}/issues/${issueNumber}`);
     revalidatePath(`/repos/${owner}/${repo}/issues`);
     return { success: true };
-  } catch (e: any) {
-    return { error: e.message || "Failed to reopen issue" };
+  } catch (e: unknown) {
+    return { error: getErrorMessage(e) };
   }
 }

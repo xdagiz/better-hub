@@ -46,11 +46,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           userName={ghUser?.name || ghUser?.login || ""}
           userAvatar={session?.user?.image || ""}
           bio={ghUser?.bio || ""}
-          company={(ghUser as any)?.company || ""}
-          location={(ghUser as any)?.location || ""}
-          publicRepos={(ghUser as any)?.public_repos ?? 0}
-          followers={(ghUser as any)?.followers ?? 0}
-          createdAt={(ghUser as any)?.created_at || ""}
+          company={ghUser?.company || ""}
+          location={ghUser?.location || ""}
+          publicRepos={ghUser?.public_repos ?? 0}
+          followers={ghUser?.followers ?? 0}
+          createdAt={ghUser?.created_at || ""}
         />
       </GitHubLinkInterceptor>
       </CodeThemeProvider>

@@ -40,14 +40,14 @@ export const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
         const highlighter = await getClientHighlighter();
         const loaded = highlighter.getLoadedLanguages();
         let effectiveLang = lang;
-        if (!loaded.includes(lang as any)) {
+        if (!(loaded as string[]).includes(lang)) {
           try {
-            await highlighter.loadLanguage(lang as any);
+            await highlighter.loadLanguage(lang as Parameters<Highlighter["loadLanguage"]>[0]);
           } catch {
             effectiveLang = "text";
-            if (!loaded.includes("text" as any)) {
+            if (!(loaded as string[]).includes("text")) {
               try {
-                await highlighter.loadLanguage("text" as any);
+                await highlighter.loadLanguage("text" as Parameters<Highlighter["loadLanguage"]>[0]);
               } catch {}
             }
           }

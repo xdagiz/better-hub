@@ -150,8 +150,8 @@ export function createSuggestionConfig(
     reactRoot.render(
       React.createElement(MentionSuggestionList, {
         items,
-        command: currentProps.command,
-        clientRect: currentProps.clientRect,
+        command: currentProps!.command,
+        clientRect: currentProps!.clientRect ?? null,
         isLoading: loading,
         ref: (r: MentionSuggestionListRef | null) => {
           listRef = r;

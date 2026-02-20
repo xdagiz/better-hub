@@ -13,9 +13,9 @@ export default async function IssuesPage() {
 
   return (
     <IssuesContent
-      assigned={assigned as any}
-      created={created as any}
-      mentioned={mentioned as any}
+      assigned={assigned}
+      created={created}
+      mentioned={mentioned}
       username={user.login}
     />
   );

@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CommandMenu } from "@/components/command-menu";
 
+interface GithubAccountSummary {
+  active: boolean;
+  avatarUrl: string;
+  login: string;
+}
+
 interface AppNavbarProps {
   userImage: string | null;
   userName: string | null;
@@ -21,7 +27,7 @@ export function AppNavbar({ userImage, userName }: AppNavbarProps) {
         const res = await fetch("/api/github-accounts");
         if (res.ok && !cancelled) {
           const data = await res.json();
-          const active = data.accounts?.find((a: any) => a.active);
+          const active = data.accounts?.find((a: GithubAccountSummary) => a.active);
           if (active) {
             setActiveAvatar(active.avatarUrl);
             setActiveLogin(active.login);
@@ -41,7 +47,7 @@ export function AppNavbar({ userImage, userName }: AppNavbarProps) {
         .then((r) => r.ok ? r.json() : null)
         .then((data) => {
           if (!data || cancelled) return;
-          const active = data.accounts?.find((a: any) => a.active);
+          const active = data.accounts?.find((a: GithubAccountSummary) => a.active);
           setActiveAvatar(active?.avatarUrl ?? null);
           setActiveLogin(active?.login ?? null);
         })
@@ -59,10 +65,10 @@ export function AppNavbar({ userImage, userName }: AppNavbarProps) {
       <nav className="top-0 flex h-full items-center justify-between border-border px-4 md:border-b">
         <div className="flex items-center gap-0" id="navbar-breadcrumb">
           <Link
-            className="shrink-0 text-foreground transition-colors text-xs tracking-tight"
+            className="shrink-0 transition-colors"
             href="/dashboard"
           >
-            BETTER-HUB.
+            <img src="/logo.svg" alt="Better Hub" width={22} height={22} className="rounded-sm" />
           </Link>
         </div>
         <div className="flex items-center gap-2">

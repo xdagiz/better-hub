@@ -1175,8 +1175,9 @@ async function processGitDataSyncJob(
         const rdRes = await ghConditionalGet(authCtx.token, rdPath, rdCached?.etag ?? null);
         if (rdRes.notModified) { await touchGithubCacheEntrySyncedAt(authCtx.userId, rdKey); }
         else {
-          const content = Buffer.from(rdRes.data.content, "base64").toString("utf-8");
-          await upsertGithubCacheEntry(authCtx.userId, rdKey, "repo_readme", { ...rdRes.data, content }, rdRes.etag);
+          const rdData = rdRes.data as { content: string; [key: string]: unknown };
+          const content = Buffer.from(rdData.content, "base64").toString("utf-8");
+          await upsertGithubCacheEntry(authCtx.userId, rdKey, "repo_readme", { ...rdData, content }, rdRes.etag);
         }
       } catch (e: unknown) {
         if (isOctokitNotFound(e)) { await upsertGithubCacheEntry(authCtx.userId, rdKey, "repo_readme", null); return; }
@@ -2315,10 +2316,18 @@ export async function getLinkedPullRequests(
 
     for (const event of events) {
       if (event.event !== "cross-referenced") continue;
-      const source = event.source?.issue;
+      const source = (event as { source?: { issue?: {
+        pull_request?: { merged_at?: string | null };
+        repository?: { full_name?: string };
+        number: number;
+        title: string;
+        state: string;
+        user?: { login: string; avatar_url: string } | null;
+        html_url: string;
+      } } }).source?.issue;
       if (!source?.pull_request) continue;
 
-      const prRepoFullName = source.repository?.full_name as string | undefined;
+      const prRepoFullName = source.repository?.full_name;
       const prKey = prRepoFullName
         ? `${prRepoFullName}#${source.number}`
         : `${source.number}`;
@@ -2332,7 +2341,7 @@ export async function getLinkedPullRequests(
       linkedPRs.push({
         number: source.number,
         title: source.title,
-        state: source.state,
+        state: source.state as "open" | "closed",
         merged: !!source.pull_request.merged_at,
         user: source.user
           ? { login: source.user.login, avatar_url: source.user.avatar_url }
@@ -2904,7 +2913,7 @@ export async function getRepoSecurityTabData(
     reports,
     dependabot,
     secretScanning,
-    permissions: extractRepoPermissions(repoResult.data),
+    permissions: extractRepoPermissions(repoResult.data ?? {}),
   };
 }
 
@@ -3229,10 +3238,10 @@ export async function getRepoContributorStats(
       login: entry.author?.login ?? "",
       total: entry.total ?? 0,
       weeks: (entry.weeks ?? []).map((w) => ({
-        w: w.w,
-        a: w.a,
-        d: w.d,
-        c: w.c,
+        w: w.w ?? 0,
+        a: w.a ?? 0,
+        d: w.d ?? 0,
+        c: w.c ?? 0,
       })),
     }));
   } catch {
@@ -3314,7 +3323,7 @@ export async function getWeeklyParticipation(
 
   try {
     let response = await octokit.request("GET /repos/{owner}/{repo}/stats/participation", { owner, repo });
-    if (response.status === 202) {
+    if ((response.status as number) === 202) {
       await new Promise((r) => setTimeout(r, 2000));
       response = await octokit.request("GET /repos/{owner}/{repo}/stats/participation", { owner, repo });
     }

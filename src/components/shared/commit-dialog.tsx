@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Sparkles, GitCommit } from "lucide-react";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -63,8 +64,8 @@ export function CommitDialog({
     try {
       await onCommit(message.trim());
       onOpenChange(false);
-    } catch (e: any) {
-      setError(e.message || "Failed to commit");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || "Failed to commit");
     } finally {
       setIsCommitting(false);
     }

@@ -20,7 +20,7 @@ type Commit = {
   author: {
     login: string;
     avatar_url: string;
-  } | null;
+  } | Record<string, never> | null;
   html_url: string;
 };
 

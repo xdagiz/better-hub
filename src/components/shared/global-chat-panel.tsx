@@ -157,7 +157,7 @@ export function GlobalChatPanel() {
       .then((data) => {
         if (data.conversations) {
           setGhostHistory(
-            data.conversations.map((c: any) => ({
+            data.conversations.map((c: { contextKey: string; title: string; updatedAt: string }) => ({
               contextKey: c.contextKey,
               title: c.title,
               updatedAt: c.updatedAt,
@@ -219,9 +219,9 @@ export function GlobalChatPanel() {
 
   // Extract mentionable files from PR context
   const mentionableFiles = useMemo(() => {
-    const prCtx = state.contextBody?.prContext;
+    const prCtx = state.contextBody?.prContext as { files?: { filename: string; patch: string }[] } | undefined;
     if (!prCtx?.files) return undefined;
-    return prCtx.files as { filename: string; patch: string }[];
+    return prCtx.files;
   }, [state.contextBody]);
 
   // # file mention: search repo files

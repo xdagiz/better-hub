@@ -45,22 +45,19 @@ function resolveModel(userModel: string, task: GhostTaskType = "default"): strin
 // ─── Safe tool wrapper ──────────────────────────────────────────────────────
 // Wraps all tool execute functions with try/catch so a single tool failure
 // (e.g. GitHub 403, rate limit, network error) doesn't crash the entire stream.
-interface ToolLike {
-  execute?: (...args: unknown[]) => Promise<unknown>;
-  [key: string]: unknown;
-}
-
-function withSafeTools(tools: Record<string, ToolLike>): Record<string, ToolLike> {
-  const wrapped: Record<string, ToolLike> = {};
+function withSafeTools<T extends Record<string, unknown>>(tools: T): T {
+  const wrapped: Record<string, unknown> = {};
   for (const [name, t] of Object.entries(tools)) {
+    if (t === undefined) continue;
     if (!t || typeof t !== "object") { wrapped[name] = t; continue; }
-    const origExecute = t.execute;
+    const tObj = t as Record<string, unknown>;
+    const origExecute = tObj.execute;
     if (typeof origExecute !== "function") { wrapped[name] = t; continue; }
     wrapped[name] = {
-      ...t,
+      ...tObj,
       execute: async (...args: unknown[]) => {
         try {
-          return await origExecute(...args);
+          return await (origExecute as (...a: unknown[]) => Promise<unknown>)(...args);
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : `Tool "${name}" failed`;
           return { error: message };
@@ -68,7 +65,7 @@ function withSafeTools(tools: Record<string, ToolLike>): Record<string, ToolLike
       },
     };
   }
-  return wrapped;
+  return wrapped as T;
 }
 
 // ─── Supermemory ─────────────────────────────────────────────────────────────
@@ -878,10 +875,10 @@ Only GET requests are allowed. For mutations use the dedicated tools.`,
             };
           }
           return data;
-        } catch (e: any) {
+        } catch (e: unknown) {
           return {
-            error: e.message || "GitHub API request failed",
-            status: e.status || null,
+            error: e instanceof Error ? e.message : "GitHub API request failed",
+            status: (e as { status?: number }).status ?? null,
           };
         }
       },
@@ -985,8 +982,8 @@ Only GET requests are allowed. For mutations use the dedicated tools.`,
             name: label,
           });
           return { success: true, removed: label };
-        } catch (e: any) {
-          return { error: e.message || "Failed to remove label" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to remove label" };
         }
       },
     }),
@@ -1059,8 +1056,8 @@ Only GET requests are allowed. For mutations use the dedicated tools.`,
             from: fromRef,
             sha,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to create branch" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to create branch" };
         }
       },
     }),
@@ -1223,8 +1220,8 @@ function getPrTools(octokit: Octokit, prContext: PRContext, commitAuthor?: Commi
             "base64"
           ).toString("utf-8");
           return { path, content };
-        } catch (e: any) {
-          return { error: e.message || "Failed to read file" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to read file" };
         }
       },
     }),
@@ -1262,7 +1259,7 @@ function getPrTools(octokit: Octokit, prContext: PRContext, commitAuthor?: Commi
             sha: (fileData as { sha?: string }).sha,
             branch: prContext.headBranch,
             ...(commitAuthor ? { author: commitAuthor, committer: commitAuthor } : {}),
-          } as any);
+          });
 
           return {
             success: true,
@@ -1270,8 +1267,8 @@ function getPrTools(octokit: Octokit, prContext: PRContext, commitAuthor?: Commi
             branch: prContext.headBranch,
             commitMessage,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to edit file" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to edit file" };
         }
       },
     }),
@@ -1295,7 +1292,7 @@ function getPrTools(octokit: Octokit, prContext: PRContext, commitAuthor?: Commi
             content: Buffer.from(content).toString("base64"),
             branch: prContext.headBranch,
             ...(commitAuthor ? { author: commitAuthor, committer: commitAuthor } : {}),
-          } as any);
+          });
 
           return {
             success: true,
@@ -1303,8 +1300,8 @@ function getPrTools(octokit: Octokit, prContext: PRContext, commitAuthor?: Commi
             branch: prContext.headBranch,
             commitMessage,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to create file" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to create file" };
         }
       },
     }),
@@ -1410,8 +1407,8 @@ function getPrTools(octokit: Octokit, prContext: PRContext, commitAuthor?: Commi
             newSha: newCommit.sha.slice(0, 7),
             filesChanged: files.map((f) => f.path),
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to amend commit" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to amend commit" };
         }
       },
     }),
@@ -1450,8 +1447,8 @@ function getIssueTools(
             "base64"
           ).toString("utf-8");
           return { path, content };
-        } catch (e: any) {
-          return { error: e.message || "Failed to read file" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to read file" };
         }
       },
     }),
@@ -1483,8 +1480,8 @@ function getIssueTools(
                 ref: `refs/heads/${branchName}`,
                 sha: refData.object.sha,
               });
-            } catch (e: any) {
-              if (e.status !== 422) throw e;
+            } catch (e: unknown) {
+              if ((e as { status?: number }).status !== 422) throw e;
             }
             workingBranch = branchName;
           }
@@ -1508,7 +1505,7 @@ function getIssueTools(
             sha: (fileData as { sha?: string }).sha,
             branch: workingBranch,
             ...(commitAuthor ? { author: commitAuthor, committer: commitAuthor } : {}),
-          } as any);
+          });
 
           return {
             success: true,
@@ -1516,8 +1513,8 @@ function getIssueTools(
             branch: workingBranch,
             commitMessage,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to edit file" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to edit file" };
         }
       },
     }),
@@ -1547,8 +1544,8 @@ function getIssueTools(
                 ref: `refs/heads/${branchName}`,
                 sha: refData.object.sha,
               });
-            } catch (e: any) {
-              if (e.status !== 422) throw e;
+            } catch (e: unknown) {
+              if ((e as { status?: number }).status !== 422) throw e;
             }
             workingBranch = branchName;
           }
@@ -1561,7 +1558,7 @@ function getIssueTools(
             content: Buffer.from(content).toString("base64"),
             branch: workingBranch,
             ...(commitAuthor ? { author: commitAuthor, committer: commitAuthor } : {}),
-          } as any);
+          });
 
           return {
             success: true,
@@ -1569,8 +1566,8 @@ function getIssueTools(
             branch: workingBranch,
             commitMessage,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to create file" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to create file" };
         }
       },
     }),
@@ -1613,8 +1610,8 @@ function getIssueTools(
             repo: issueContext.repo,
             pullNumber: data.number,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to create pull request" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to create pull request" };
         }
       },
     }),
@@ -1704,8 +1701,8 @@ function getSemanticSearchTool(userId: string) {
             .sort((a, b) => b.score - a.score);
 
           return { results };
-        } catch (e: any) {
-          return { error: e.message || "Semantic search failed" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Semantic search failed" };
         }
       },
     }),
@@ -2215,7 +2212,7 @@ function getCodeEditTools(octokit: Octokit, commitAuthor?: CommitAuthor) {
           const { data: newTree } = await octokit.git.createTree({
             owner, repo,
             base_tree: baseTreeSha,
-            tree: treeEntries as { path: string; mode: string; type: string; sha: string | null }[],
+            tree: treeEntries,
           });
 
           const { data: newCommit } = await octokit.git.createCommit({
@@ -2260,8 +2257,8 @@ function getCodeEditTools(octokit: Octokit, commitAuthor?: CommitAuthor) {
             filesChanged: filesToCommit.length,
             filesDeleted: filesToDelete.length,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to commit changes" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to commit changes" };
         }
       },
     }),
@@ -2294,8 +2291,8 @@ function getCodeEditTools(octokit: Octokit, commitAuthor?: CommitAuthor) {
             repo,
             pullNumber: data.number,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to create pull request" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to create pull request" };
         }
       },
     }),
@@ -2321,7 +2318,7 @@ function getMergeConflictTools(octokit: Octokit, commitAuthor?: CommitAuthor) {
             owner, repo,
             base: baseBranch,
             head: headBranch,
-          } as any);
+          });
 
           const files = (comparison as { files?: { filename: string; status: string }[] }).files || [];
           if (files.length === 0) {
@@ -2367,8 +2364,8 @@ function getMergeConflictTools(octokit: Octokit, commitAuthor?: CommitAuthor) {
             totalFiles: files.length,
             files: conflictFiles,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to get merge conflict info" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to get merge conflict info" };
         }
       },
     }),
@@ -2451,8 +2448,8 @@ function getMergeConflictTools(octokit: Octokit, commitAuthor?: CommitAuthor) {
             resolvedFileCount: resolvedFiles.length,
             message,
           };
-        } catch (e: any) {
-          return { error: e.message || "Failed to create merge commit" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to create merge commit" };
         }
       },
     }),
@@ -2696,8 +2693,8 @@ The sandbox has git, node, npm, python, and common dev tools.
             return { error: errMsg, exitCode: result.exitCode, stdout, stderr };
           }
           return { success: true, stdout, stderr, exitCode: 0 };
-        } catch (e: any) {
-          return { error: e.message || "Command failed" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Command failed" };
         }
       },
     }),
@@ -2729,8 +2726,8 @@ The sandbox has git, node, npm, python, and common dev tools.
             };
           }
           return { path: absPath, content };
-        } catch (e: any) {
-          return { error: e.message || "Failed to read file" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to read file" };
         }
       },
     }),
@@ -2757,8 +2754,8 @@ The sandbox has git, node, npm, python, and common dev tools.
             { path: absPath, content: Buffer.from(content) },
           ]);
           return { success: true, path: absPath };
-        } catch (e: any) {
-          return { error: e.message || "Failed to write file" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to write file" };
         }
       },
     }),
@@ -2773,8 +2770,8 @@ The sandbox has git, node, npm, python, and common dev tools.
           sandbox = null;
           repoPath = null;
           return { success: true, message: "Sandbox terminated." };
-        } catch (e: any) {
-          return { error: e.message || "Failed to stop sandbox" };
+        } catch (e: unknown) {
+          return { error: (e instanceof Error ? e.message : null) || "Failed to stop sandbox" };
         }
       },
     }),
@@ -2820,7 +2817,7 @@ export async function POST(req: Request) {
 
   // Determine mode and build tools + system prompt
   let systemPrompt: string;
-  let tools: Record<string, ToolLike>;
+  let tools: Record<string, unknown>;
 
   const generalTools = getGeneralTools(octokit, pageContext, userId ?? undefined);
   const codeEditTools = getCodeEditTools(octokit, commitAuthor);
@@ -3040,7 +3037,7 @@ export async function POST(req: Request) {
       model: createOpenRouter({ apiKey })(modelId),
       system: systemPrompt,
       messages: await convertToModelMessages(messages),
-      tools,
+      tools: tools as Parameters<typeof streamText>[0]["tools"],
       maxRetries: 4,
       stopWhen: stepCountIs(50),
       onError() {},

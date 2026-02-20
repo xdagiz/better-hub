@@ -133,7 +133,7 @@ export default async function BlobPage({
         filePath={path}
         filename={filename}
         canEdit={canEdit}
-        sha={(file as any).sha}
+        sha={file.sha}
         owner={owner}
         repo={repo}
         branch={ref}
@@ -148,7 +148,7 @@ export default async function BlobPage({
       filePath={path}
       fileSize={file.size}
       canEdit={canEdit}
-      sha={(file as any).sha}
+      sha={file.sha}
       owner={owner}
       repo={repo}
       branch={ref}

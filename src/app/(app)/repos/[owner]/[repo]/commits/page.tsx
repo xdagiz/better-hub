@@ -17,9 +17,9 @@ export default async function CommitsPage({
     <CommitsList
       owner={owner}
       repo={repo}
-      commits={commits as any}
+      commits={commits as Parameters<typeof CommitsList>[0]["commits"]}
       defaultBranch={repoData.default_branch}
-      branches={(branches as any) ?? []}
+      branches={branches as Parameters<typeof CommitsList>[0]["branches"]}
     />
   );
 }

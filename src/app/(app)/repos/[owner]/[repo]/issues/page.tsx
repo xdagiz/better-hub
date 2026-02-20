@@ -20,11 +20,11 @@ export default async function IssuesListPage({
     <IssuesList
       owner={owner}
       repo={repo}
-      openIssues={openIssues as any}
-      closedIssues={closedIssues as any}
+      openIssues={openIssues as Parameters<typeof IssuesList>[0]["openIssues"]}
+      closedIssues={closedIssues as Parameters<typeof IssuesList>[0]["closedIssues"]}
       openCount={openCount.total_count}
       closedCount={closedCount.total_count}
-      onAuthorFilter={fetchIssuesByAuthor as any}
+      onAuthorFilter={fetchIssuesByAuthor as Parameters<typeof IssuesList>[0]["onAuthorFilter"]}
     />
   );
 }

@@ -14,10 +14,10 @@ export default async function PRsPage() {
 
   return (
     <PRsContent
-      created={created as any}
-      reviewRequested={reviewRequested as any}
-      assigned={assigned as any}
-      mentioned={mentioned as any}
+      created={created as Parameters<typeof PRsContent>[0]["created"]}
+      reviewRequested={reviewRequested as Parameters<typeof PRsContent>[0]["reviewRequested"]}
+      assigned={assigned as Parameters<typeof PRsContent>[0]["assigned"]}
+      mentioned={mentioned as Parameters<typeof PRsContent>[0]["mentioned"]}
       username={user.login}
     />
   );

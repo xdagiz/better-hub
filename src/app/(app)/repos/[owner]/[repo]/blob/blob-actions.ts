@@ -1,6 +1,7 @@
 "use server";
 
 import { getOctokit, invalidateFileContentCache } from "@/lib/github";
+import { getErrorMessage } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
 export async function commitFileEdit(
@@ -29,8 +30,8 @@ export async function commitFileEdit(
     await invalidateFileContentCache(owner, repo, path, branch);
     revalidatePath(`/repos/${owner}/${repo}/blob`);
 
-    return { success: true, newSha: (data.content as any)?.sha };
-  } catch (e: any) {
-    return { error: e.message || "Failed to commit file edit" };
+    return { success: true, newSha: data.content?.sha };
+  } catch (e: unknown) {
+    return { error: getErrorMessage(e) };
   }
 }

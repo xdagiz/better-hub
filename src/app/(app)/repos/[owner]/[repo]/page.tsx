@@ -66,10 +66,10 @@ export default async function RepoPage({
         <RepoOverview
           owner={owner}
           repo={repo}
-          repoData={repoData}
+          repoData={repoData as unknown as Parameters<typeof RepoOverview>[0]["repoData"]}
           isMaintainer={true}
-          openPRs={openPRs as Array<{ number: number; title: string; user: { login: string; avatar_url: string } | null; created_at: string; pull_request?: unknown; comments: number; draft?: boolean }>}
-          openIssues={openIssues as Array<{ number: number; title: string; user: { login: string; avatar_url: string } | null; created_at: string; pull_request?: unknown; comments: number; reactions?: { total_count: number }; labels?: Array<{ name?: string; color?: string }> }>}
+          openPRs={openPRs as unknown as Parameters<typeof RepoOverview>[0]["openPRs"]}
+          openIssues={openIssues as unknown as Parameters<typeof RepoOverview>[0]["openIssues"]}
           openPRCount={navCounts.openPrs}
           openIssueCount={navCounts.openIssues}
           commitActivity={commitActivity}
@@ -106,10 +106,10 @@ export default async function RepoPage({
       <RepoOverview
         owner={owner}
         repo={repo}
-        repoData={repoData}
+        repoData={repoData as unknown as Parameters<typeof RepoOverview>[0]["repoData"]}
         isMaintainer={false}
-        openPRs={openPRs as Array<{ number: number; title: string; user: { login: string; avatar_url: string } | null; created_at: string; pull_request?: unknown; comments: number; draft?: boolean }>}
-        openIssues={openIssues as Array<{ number: number; title: string; user: { login: string; avatar_url: string } | null; created_at: string; pull_request?: unknown; comments: number; reactions?: { total_count: number }; labels?: Array<{ name?: string; color?: string }> }>}
+        openPRs={openPRs as unknown as Parameters<typeof RepoOverview>[0]["openPRs"]}
+        openIssues={openIssues as unknown as Parameters<typeof RepoOverview>[0]["openIssues"]}
         openPRCount={navCounts.openPrs}
         openIssueCount={navCounts.openIssues}
         readmeSlot={readmeSlot}

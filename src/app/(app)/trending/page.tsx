@@ -10,9 +10,9 @@ export default async function TrendingPage() {
 
   return (
     <TrendingContent
-      weekly={weekly as any}
-      daily={daily as any}
-      monthly={monthly as any}
+      weekly={weekly as unknown as Parameters<typeof TrendingContent>[0]["weekly"]}
+      daily={daily as unknown as Parameters<typeof TrendingContent>[0]["daily"]}
+      monthly={monthly as unknown as Parameters<typeof TrendingContent>[0]["monthly"]}
     />
   );
 }

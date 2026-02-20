@@ -23,6 +23,7 @@ interface RepoEvent {
   type: string;
   actor: { login: string; avatar_url: string } | null;
   created_at: string;
+  org?: { login: string; avatar_url: string };
   repo?: { name: string };
   payload?: {
     action?: string;
@@ -254,16 +255,16 @@ export function RepoActivityView({ owner, repo, events, commitActivity }: RepoAc
                     >
                       {event.actor?.login}
                     </Link>
-                    {(event as any).org?.login && (
+                    {event.org?.login && (
                       <>
                         {" "}
                         <span className="text-muted-foreground/40">@</span>
                         <Link
-                          href={`/orgs/${(event as any).org.login}`}
+                          href={`/orgs/${event.org.login}`}
                           className="text-muted-foreground/50 hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {(event as any).org.login}
+                          {event.org.login}
                         </Link>
                       </>
                     )}

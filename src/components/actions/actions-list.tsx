@@ -30,7 +30,7 @@ interface Workflow {
 
 interface WorkflowRun {
   id: number;
-  name: string;
+  name?: string | null;
   display_title: string;
   run_number: number;
   status: string | null;

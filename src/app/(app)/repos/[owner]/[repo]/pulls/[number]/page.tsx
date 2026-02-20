@@ -13,6 +13,7 @@ import {
   getRepoContributors,
   type CheckStatus,
   type PRBundleData,
+  type PersonRepoActivity,
 } from "@/lib/github";
 import { computeContributorScore, type ScoreResult } from "@/lib/contributor-score";
 import { extractParticipants } from "@/lib/github-utils";
@@ -24,6 +25,7 @@ import {
   PRConversation,
   type TimelineEntry,
   type ReviewCommentEntry,
+  type CommitEntry,
 } from "@/components/pr/pr-conversation";
 import { PRMergePanel } from "@/components/pr/pr-merge-panel";
 import { PRCommentForm } from "@/components/pr/pr-comment-form";
@@ -35,6 +37,32 @@ import { TrackView } from "@/components/shared/track-view";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { inngest } from "@/lib/inngest";
+
+type GitHubOrg = { login: string; avatar_url: string };
+type GitHubPublicRepo = {
+  name: string;
+  full_name: string;
+  stargazers_count: number;
+  language: string | null;
+};
+type GitHubUserProfile = {
+  followers: number;
+  public_repos: number;
+  created_at: string;
+};
+type GitHubPRFile = {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch?: string;
+  previous_filename?: string;
+};
+type RepoWithMergeSettings = {
+  allow_merge_commit?: boolean;
+  allow_squash_merge?: boolean;
+  allow_rebase_merge?: boolean;
+};
 
 export default async function PRDetailPage({
   params,
@@ -67,7 +95,7 @@ export default async function PRDetailPage({
   const { pr, issueComments, reviewComments, reviews, reviewThreads: threads, commits } = bundle;
   const comments = { issueComments, reviewComments };
 
-  const permissions = extractRepoPermissions(repoData);
+  const permissions = extractRepoPermissions(repoData ?? {});
   const canWrite = permissions.push || permissions.admin || permissions.maintain;
   const canTriage = canWrite || permissions.triage;
 
@@ -84,30 +112,35 @@ export default async function PRDetailPage({
     : [null, [], [], { commits: [], prs: [], issues: [], reviews: [] }, { list: [], totalCount: 0 }];
 
   // Compute contributor score
-  const isOrgMember = (authorOrgs as any[]).some(
-    (o: any) => o.login?.toLowerCase() === owner.toLowerCase()
+  const orgs = authorOrgs as GitHubOrg[];
+  const repos = authorRepos as GitHubPublicRepo[];
+  const activity = authorActivity as PersonRepoActivity;
+
+  const isOrgMember = orgs.some(
+    (o) => o.login?.toLowerCase() === owner.toLowerCase()
   );
-  const contributorEntry = (contributors as any).list?.find(
-    (c: any) => c.login?.toLowerCase() === authorLogin?.toLowerCase()
+  const contributorEntry = contributors.list?.find(
+    (c) => c.login?.toLowerCase() === authorLogin?.toLowerCase()
   );
-  const sortedAuthorRepos = (authorRepos as any[])
-    .sort((a: any, b: any) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
+  const sortedAuthorRepos = [...repos]
+    .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
     .slice(0, 6);
 
   let contributorScore: ScoreResult | null = null;
   if (authorProfile && authorLogin) {
+    const profile = authorProfile as GitHubUserProfile;
     contributorScore = computeContributorScore({
-      followers: (authorProfile as any).followers ?? 0,
-      publicRepos: (authorProfile as any).public_repos ?? 0,
-      accountCreated: (authorProfile as any).created_at ?? "",
-      commitsInRepo: (authorActivity as any).commits?.length ?? 0,
-      prsInRepo: ((authorActivity as any).prs ?? []).map((p: any) => ({ state: p.state })),
-      reviewsInRepo: (authorActivity as any).reviews?.length ?? 0,
+      followers: profile.followers ?? 0,
+      publicRepos: profile.public_repos ?? 0,
+      accountCreated: profile.created_at ?? "",
+      commitsInRepo: activity.commits?.length ?? 0,
+      prsInRepo: (activity.prs ?? []).map((p) => ({ state: p.state })),
+      reviewsInRepo: activity.reviews?.length ?? 0,
       isContributor: !!contributorEntry,
       contributionCount: contributorEntry?.contributions ?? 0,
       isOrgMember,
       isOwner: authorLogin?.toLowerCase() === owner.toLowerCase(),
-      topRepoStars: sortedAuthorRepos.map((r: any) => r.stargazers_count ?? 0),
+      topRepoStars: sortedAuthorRepos.map((r) => r.stargazers_count ?? 0),
     });
   }
 
@@ -139,8 +172,8 @@ export default async function PRDetailPage({
         title: pr.title,
         body: pr.body ?? "",
         comments: comments.issueComments
-          .filter((c: any) => c.body)
-          .map((c: any) => ({
+          .filter((c) => c.body)
+          .map((c) => ({
             id: c.id,
             body: c.body,
             author: c.user?.login ?? "unknown",
@@ -162,7 +195,7 @@ export default async function PRDetailPage({
   // Group review comments by pull_request_review_id
   const reviewCommentsByReviewId = new Map<number, ReviewCommentEntry[]>();
   for (const rc of comments.reviewComments) {
-    const reviewId = (rc as any).pull_request_review_id as number | undefined;
+    const reviewId = rc.pull_request_review_id;
     if (reviewId) {
       const existing = reviewCommentsByReviewId.get(reviewId) || [];
       existing.push({
@@ -171,8 +204,8 @@ export default async function PRDetailPage({
           ? { login: rc.user.login, avatar_url: rc.user.avatar_url }
           : null,
         body: rc.body || "",
-        path: (rc as any).path || "",
-        line: (rc as any).line ?? (rc as any).original_line ?? null,
+        path: rc.path || "",
+        line: rc.line,
         created_at: rc.created_at,
       });
       reviewCommentsByReviewId.set(reviewId, existing);
@@ -190,7 +223,7 @@ export default async function PRDetailPage({
       : null,
     body: pr.body || "",
     created_at: pr.created_at,
-    reactions: (pr as any).reactions ?? undefined,
+    reactions: pr.reactions ?? undefined,
   });
 
   for (const c of comments.issueComments) {
@@ -198,12 +231,12 @@ export default async function PRDetailPage({
       type: "comment",
       id: c.id,
       user: c.user
-        ? { login: c.user.login, avatar_url: c.user.avatar_url, type: (c.user as any).type ?? undefined }
+        ? { login: c.user.login, avatar_url: c.user.avatar_url, type: c.user.type }
         : null,
       body: c.body || "",
       created_at: c.created_at,
-      author_association: (c as any).author_association,
-      reactions: (c as any).reactions ?? undefined,
+      author_association: c.author_association,
+      reactions: c.reactions ?? undefined,
     });
   }
 
@@ -212,30 +245,29 @@ export default async function PRDetailPage({
       type: "review",
       id: r.id,
       user: r.user
-        ? { login: r.user.login, avatar_url: r.user.avatar_url, type: (r.user as any).type ?? undefined }
+        ? { login: r.user.login, avatar_url: r.user.avatar_url, type: r.user.type }
         : null,
       body: r.body || null,
       state: r.state,
-      created_at: (r as any).created_at || r.submitted_at || "",
+      created_at: r.created_at || r.submitted_at || "",
       submitted_at: r.submitted_at || null,
       comments: reviewCommentsByReviewId.get(r.id) || [],
     });
   }
 
   for (const c of commits) {
-    const commitAuthor = (c as any).author;
-    const commitData = (c as any).commit;
-    timeline.push({
-      type: "commit" as const,
-      id: (c as any).sha as string,
-      sha: (c as any).sha as string,
-      message: commitData?.message || "",
-      user: commitAuthor
-        ? { login: commitAuthor.login, avatar_url: commitAuthor.avatar_url }
+    const entry: CommitEntry = {
+      type: "commit",
+      id: c.sha,
+      sha: c.sha,
+      message: c.commit?.message || "",
+      user: c.author
+        ? { login: c.author.login, avatar_url: c.author.avatar_url }
         : null,
-      committer_name: commitData?.author?.name || commitData?.committer?.name || null,
-      created_at: commitData?.author?.date || commitData?.committer?.date || "",
-    } as any);
+      committer_name: c.commit?.author?.name || c.commit?.committer?.name || null,
+      created_at: c.commit?.author?.date || c.commit?.committer?.date || "",
+    };
+    timeline.push(entry);
   }
 
   timeline.sort((a, b) => {
@@ -249,15 +281,16 @@ export default async function PRDetailPage({
   });
 
   // Pre-highlight diff lines with Shiki
+  const prFiles = (files ?? []) as GitHubPRFile[];
   const highlightData: Record<string, Record<string, SyntaxToken[]>> = {};
-  if (files && files.length > 0) {
+  if (prFiles.length > 0) {
     await Promise.all(
-      (files as any[]).map(async (file: any) => {
+      prFiles.map(async (file) => {
         if (file.patch) {
           try {
             highlightData[file.filename] = await highlightDiffLines(file.patch, file.filename);
-          } catch (err) {
-            console.error(`[highlight-debug] error highlighting ${file.filename}:`, err);
+          } catch {
+            // highlight error — skip file
           }
         }
       })
@@ -295,10 +328,10 @@ export default async function PRDetailPage({
   // Extract participants for @mention autocomplete
   const participants = extractParticipants([
     pr.user ? { login: pr.user.login, avatar_url: pr.user.avatar_url } : null,
-    ...comments.issueComments.map((c: any) =>
+    ...comments.issueComments.map((c) =>
       c.user ? { login: c.user.login, avatar_url: c.user.avatar_url } : null
     ),
-    ...comments.reviewComments.map((c: any) =>
+    ...comments.reviewComments.map((c) =>
       c.user ? { login: c.user.login, avatar_url: c.user.avatar_url } : null
     ),
     ...reviews.map((r) =>
@@ -318,7 +351,7 @@ export default async function PRDetailPage({
     />
     <PRDetailLayout
       commentCount={comments.issueComments.length}
-      fileCount={files?.length || 0}
+      fileCount={prFiles.length}
       hasReviews={reviews.some((r) => r.state !== "PENDING")}
       conflictPanel={
         showConflictResolver ? (
@@ -370,18 +403,18 @@ export default async function PRDetailPage({
                   pullNumber={pr.number}
                   prTitle={pr.title}
                   prBody={pr.body || ""}
-                  commitMessages={commits.map((c: any) => c.commit?.message || "").filter(Boolean)}
+                  commitMessages={commits.map((c) => c.commit?.message || "").filter(Boolean)}
                   state={pr.state}
                   merged={!!pr.merged_at}
                   mergeable={pr.mergeable ?? null}
                   allowMergeCommit={
-                    (repoData as any)?.allow_merge_commit ?? true
+                    (repoData as RepoWithMergeSettings | null)?.allow_merge_commit ?? true
                   }
                   allowSquashMerge={
-                    (repoData as any)?.allow_squash_merge ?? true
+                    (repoData as RepoWithMergeSettings | null)?.allow_squash_merge ?? true
                   }
                   allowRebaseMerge={
-                    (repoData as any)?.allow_rebase_merge ?? true
+                    (repoData as RepoWithMergeSettings | null)?.allow_rebase_merge ?? true
                   }
                   headBranch={pr.head.ref}
                   baseBranch={pr.base.ref}
@@ -395,11 +428,20 @@ export default async function PRDetailPage({
       }
       diffPanel={
         <PRDiffViewer
-          files={files as any}
-          reviewComments={comments.reviewComments as any}
+          files={prFiles}
+          reviewComments={comments.reviewComments as unknown as Array<{
+            id: number;
+            user: { login: string; avatar_url: string } | null;
+            body: string;
+            path: string;
+            line: number | null;
+            original_line: number | null;
+            side: string | null;
+            created_at: string;
+          }>}
           reviewThreads={threads}
           reviewSummaries={reviewSummaries}
-          commits={commits as any}
+          commits={commits}
           owner={owner}
           repo={repo}
           pullNumber={pullNumber}
@@ -416,13 +458,13 @@ export default async function PRDetailPage({
           {authorProfile && (
             <PRAuthorDossier
               author={authorProfile as AuthorDossierData}
-              orgs={(authorOrgs as any[]).map((o: any) => ({
+              orgs={orgs.map((o) => ({
                 login: o.login,
                 avatar_url: o.avatar_url,
               }))}
               topRepos={sortedAuthorRepos
                 .slice(0, 3)
-                .map((r: any) => ({
+                .map((r) => ({
                   name: r.name,
                   full_name: r.full_name,
                   stargazers_count: r.stargazers_count ?? 0,
@@ -432,10 +474,10 @@ export default async function PRDetailPage({
               score={contributorScore}
               contributionCount={contributorEntry?.contributions ?? 0}
               repoActivity={{
-                commits: (authorActivity as any).commits?.length ?? 0,
-                prs: (authorActivity as any).prs?.length ?? 0,
-                reviews: (authorActivity as any).reviews?.length ?? 0,
-                issues: (authorActivity as any).issues?.length ?? 0,
+                commits: activity.commits?.length ?? 0,
+                prs: activity.prs?.length ?? 0,
+                reviews: activity.reviews?.length ?? 0,
+                issues: activity.issues?.length ?? 0,
               }}
               openedAt={pr.created_at}
             />
@@ -467,7 +509,7 @@ export default async function PRDetailPage({
             prBody: pr.body || "",
             baseBranch: pr.base.ref,
             headBranch: pr.head.ref,
-            files: (files || []).map((f: any) => ({
+            files: prFiles.map((f) => ({
               filename: f.filename,
               patch: f.patch || "",
             })),

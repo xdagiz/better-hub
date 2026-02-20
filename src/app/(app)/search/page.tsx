@@ -11,7 +11,7 @@ export default async function SearchPage({
       initialQuery={params.q || ""}
       initialLanguage={params.lang || ""}
       initialPage={Number(params.page) || 1}
-      initialType={(params.type as any) || "code"}
+      initialType={(params.type as "code" | "repos" | "issues" | "prs" | "users") || "code"}
     />
   );
 }

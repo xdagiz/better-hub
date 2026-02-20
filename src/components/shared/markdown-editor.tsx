@@ -102,7 +102,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
       ],
       content: value,
       onUpdate: ({ editor }) => {
-        const md = (editor.storage as Record<string, { getMarkdown: () => string }>).markdown.getMarkdown();
+        const md = (editor.storage as unknown as Record<string, { getMarkdown: () => string }>).markdown.getMarkdown();
         lastReportedMd.current = md;
         onChange(md);
       },

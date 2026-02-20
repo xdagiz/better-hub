@@ -22,8 +22,8 @@ export default async function WorkflowRunPage({
     <RunDetail
       owner={owner}
       repo={repo}
-      run={run as any}
-      jobs={jobs as any}
+      run={run as Parameters<typeof RunDetail>[0]["run"]}
+      jobs={jobs as Parameters<typeof RunDetail>[0]["jobs"]}
     />
   );
 }
