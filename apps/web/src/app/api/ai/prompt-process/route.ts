@@ -3,7 +3,7 @@ import { streamText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 import { getOctokitFromSession, getGitHubToken } from "@/lib/ai-auth";
 import type { Octokit } from "@octokit/rest";
-import { Sandbox } from "@vercel/sandbox";
+import { Daytona, type Sandbox } from "@daytonaio/sdk";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { after } from "next/server";
@@ -330,24 +330,7 @@ function buildSandboxTools(
 ) {
 	let sandbox: Sandbox | null = null;
 	let repoPath: string | null = null;
-
-	async function runShell(
-		sbx: Sandbox,
-		command: string,
-		opts?: { cwd?: string; timeout?: number },
-	) {
-		const result = await sbx.runCommand({
-			cmd: "bash",
-			args: ["-c", command],
-			cwd: opts?.cwd,
-			signal: AbortSignal.timeout(opts?.timeout ?? 120_000),
-		});
-		return {
-			exitCode: result.exitCode,
-			stdout: await result.stdout(),
-			stderr: await result.stderr(),
-		};
-	}
+	const daytona = new Daytona();
 
 	return {
 		startSandbox: tool({
@@ -362,15 +345,15 @@ function buildSandboxTools(
 			execute: async ({ branch }) => {
 				// Make idempotent — kill existing sandbox if any
 				if (sandbox) {
-					await sandbox.stop().catch(() => {});
+					await sandbox.delete().catch(() => {});
 					sandbox = null;
 					repoPath = null;
 				}
 
 				try {
-					sandbox = await Sandbox.create({
-						timeout: 10 * 60 * 1000,
-						runtime: "node24",
+					sandbox = await daytona.create({
+						language: "typescript",
+						autoStopInterval: 10,
 					});
 				} catch (e: any) {
 					sandbox = null;
@@ -378,43 +361,36 @@ function buildSandboxTools(
 				}
 
 				try {
-					// Read-only git config — no credential helper for push
-					await runShell(
-						sandbox,
+					// Git config
+					await sandbox.process.executeCommand(
 						`git config --global user.name "Ghost" && git config --global user.email "ghost@better-github.app"`,
 					);
 
-					repoPath = `/vercel/sandbox/${repo}`;
-					// Full clone (no shallow) — use token in URL for private repo access
-					const cloneUrl = `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`;
-					const cloneCmd = branch
-						? `git clone --branch ${branch} ${cloneUrl} ${repoPath}`
-						: `git clone ${cloneUrl} ${repoPath}`;
-					const cloneResult = await runShell(sandbox, cloneCmd);
+					repoPath = `/home/daytona/${repo}`;
+					// Clone via built-in git support
+					await sandbox.git.clone(
+						`https://github.com/${owner}/${repo}.git`,
+						repoPath,
+						branch || undefined,
+						undefined,
+						"x-access-token",
+						githubToken,
+					);
 
-					if (cloneResult.exitCode !== 0) {
-						await sandbox.stop().catch(() => {});
-						sandbox = null;
-						return {
-							error: `Clone failed: ${cloneResult.stderr}`,
-						};
-					}
-
-					const infoResult = await runShell(
-						sandbox,
+					const infoResult = await sandbox.process.executeCommand(
 						'echo "__BRANCH__$(git rev-parse --abbrev-ref HEAD)__END__" && ls -la',
-						{ cwd: repoPath },
+						repoPath,
 					);
 					const branchMatch =
-						infoResult.stdout.match(/__BRANCH__(.+?)__END__/);
+						infoResult.result.match(/__BRANCH__(.+?)__END__/);
 					const defaultBranch = branchMatch?.[1]?.trim() || "main";
-					const files = infoResult.stdout.replace(
+					const files = infoResult.result.replace(
 						/__BRANCH__.*__END__\n?/,
 						"",
 					);
 					return { success: true, repoPath, defaultBranch, files };
 				} catch (e: any) {
-					if (sandbox) await sandbox.stop().catch(() => {});
+					if (sandbox) await sandbox.delete().catch(() => {});
 					sandbox = null;
 					return { error: `Clone error: ${e.message}` };
 				}
@@ -430,7 +406,7 @@ function buildSandboxTools(
 					.number()
 					.optional()
 					.describe(
-						"Timeout in ms (default 120000, use 300000 for installs/builds)",
+						"Timeout in seconds (default 120, use 300 for installs/builds)",
 					),
 			}),
 			execute: async ({ command, timeout }) => {
@@ -438,23 +414,19 @@ function buildSandboxTools(
 					return {
 						error: "No sandbox running. Call startSandbox first.",
 					};
-				const result = await runShell(sandbox, command, {
-					cwd: repoPath,
-					timeout: timeout ?? 120_000,
-				});
-				const maxStdout = 10000;
-				const maxStderr = 5000;
+				const result = await sandbox.process.executeCommand(
+					command,
+					repoPath,
+					undefined,
+					timeout ?? 120,
+				);
+				const maxLen = 10000;
 				const stdout =
-					result.stdout.length > maxStdout
-						? `...(truncated ${result.stdout.length - maxStdout} chars)...\n` +
-							result.stdout.slice(-maxStdout)
-						: result.stdout;
-				const stderr =
-					result.stderr.length > maxStderr
-						? `...(truncated)...\n` +
-							result.stderr.slice(-maxStderr)
-						: result.stderr;
-				return { exitCode: result.exitCode, stdout, stderr };
+					result.result.length > maxLen
+						? `...(truncated ${result.result.length - maxLen} chars)...\n` +
+							result.result.slice(-maxLen)
+						: result.result;
+				return { exitCode: result.exitCode, stdout };
 			},
 		}),
 
@@ -472,9 +444,7 @@ function buildSandboxTools(
 					? filePath
 					: `${repoPath}/${filePath}`;
 				try {
-					const buf = await sandbox.readFileToBuffer({
-						path: absPath,
-					});
+					const buf = await sandbox.fs.downloadFile(absPath);
 					if (!buf) return { error: `File not found: ${absPath}` };
 					return { path: filePath, content: buf.toString() };
 				} catch (e: any) {
@@ -498,9 +468,10 @@ function buildSandboxTools(
 					? filePath
 					: `${repoPath}/${filePath}`;
 				try {
-					await sandbox.writeFiles([
-						{ path: absPath, content: Buffer.from(content) },
-					]);
+					await sandbox.fs.uploadFile(
+						Buffer.from(content),
+						absPath,
+					);
 					return { success: true, path: filePath };
 				} catch (e: any) {
 					return { error: e.message || "Failed to write file" };
@@ -514,7 +485,7 @@ function buildSandboxTools(
 			execute: async () => {
 				if (!sandbox) return { success: true };
 				try {
-					await sandbox.stop();
+					await sandbox.delete();
 					sandbox = null;
 					repoPath = null;
 					return { success: true };
@@ -526,7 +497,7 @@ function buildSandboxTools(
 
 		_cleanup: async () => {
 			if (sandbox) {
-				await sandbox.stop().catch(() => {});
+				await sandbox.delete().catch(() => {});
 				sandbox = null;
 			}
 		},

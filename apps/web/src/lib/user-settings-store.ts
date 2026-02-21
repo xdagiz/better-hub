@@ -54,7 +54,6 @@ function toSettings(row: {
 export async function getUserSettings(userId: string): Promise<UserSettings> {
 	const cached = await prisma.userSettings.findUnique({
 		where: { userId },
-		cacheStrategy: { swr: 30 },
 	});
 
 	if (cached) return toSettings(cached);

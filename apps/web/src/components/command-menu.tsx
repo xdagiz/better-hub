@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import { cn, formatNumber } from "@/lib/utils";
+import { getLanguageColor } from "@/lib/github-utils";
 import { useGlobalChatOptional } from "@/components/shared/global-chat-provider";
 import { getRecentViews, type RecentViewItem } from "@/lib/recent-views";
 import { useColorTheme } from "@/components/theme/theme-provider";
@@ -60,26 +61,6 @@ interface SearchRepo {
 		avatar_url: string;
 	} | null;
 }
-
-const languageColors: Record<string, string> = {
-	TypeScript: "#3178c6",
-	JavaScript: "#f1e05a",
-	Python: "#3572A5",
-	Rust: "#dea584",
-	Go: "#00ADD8",
-	Java: "#b07219",
-	Ruby: "#701516",
-	Swift: "#F05138",
-	Kotlin: "#A97BFF",
-	"C++": "#f34b7d",
-	"C#": "#178600",
-	PHP: "#4F5D95",
-	Vue: "#41b883",
-	Svelte: "#ff3e00",
-	HTML: "#e34c26",
-	CSS: "#563d7c",
-	Shell: "#89e051",
-};
 
 interface AccountInfo {
 	id: string;
@@ -3177,9 +3158,9 @@ function RepoItem({
 							className="w-2 h-2 rounded-full"
 							style={{
 								backgroundColor:
-									languageColors[
-										repo.language
-									] || "#8b949e",
+									getLanguageColor(
+										repo.language,
+									),
 							}}
 						/>
 						{repo.language}

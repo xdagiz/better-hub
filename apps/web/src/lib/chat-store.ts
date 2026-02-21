@@ -150,7 +150,6 @@ export async function listConversations(
 		where: { userId, ...(chatType ? { chatType } : {}) },
 		orderBy: { updatedAt: "desc" },
 		take: 50,
-		cacheStrategy: { swr: 10 },
 	});
 
 	return rows.map(toConversation);
@@ -168,7 +167,6 @@ export async function listGhostConversations(
 		},
 		orderBy: { updatedAt: "desc" },
 		take: limit,
-		cacheStrategy: { swr: 10 },
 	});
 	return rows.map(toConversation);
 }

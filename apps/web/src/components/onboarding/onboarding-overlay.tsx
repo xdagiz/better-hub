@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGlobalChatOptional } from "@/components/shared/global-chat-provider";
+import { authClient } from "@/lib/auth-client";
 
 interface OnboardingOverlayProps {
 	userName: string;
@@ -60,11 +61,9 @@ export function OnboardingOverlay({
 	}, [onboardingDone]);
 
 	const markDone = useCallback(() => {
-		fetch("/api/user-settings", {
-			method: "PATCH",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ onboardingDone: true }),
-		}).catch(() => {});
+		authClient.updateUser({
+			onboardingDone: true,
+		});
 	}, []);
 
 	const dismiss = useCallback(() => {
@@ -163,10 +162,10 @@ export function OnboardingOverlay({
 					muted
 					loop
 					playsInline
-					className="absolute inset-0 w-full h-full object-cover opacity-[0.12] blur-sm"
+					className="absolute inset-0 w-full h-full object-cover opacity-[0.2] blur-sm"
 					style={{ minWidth: "100%", minHeight: "100%" }}
 				>
-					<source src="/ba-intro-2.mp4" type="video/mp4" />
+					<source src="/onboarding.mp4" type="video/mp4" />
 				</video>
 
 				{/* ── Halftone ── */}
@@ -179,7 +178,6 @@ export function OnboardingOverlay({
 						backgroundPosition: "0 0, 6px 6px",
 					}}
 				/>
-
 
 				{/* ── Film grain ── */}
 				<div
@@ -200,22 +198,49 @@ export function OnboardingOverlay({
 				{/* ── Content ── */}
 				<div className="relative z-10 flex items-center justify-center w-full h-full px-6 sm:px-10">
 					<div className="w-full max-w-md text-left ob-fade-up">
-						<img src="/logo.svg" alt="Better Hub" className="h-[18px] sm:h-[20px] brightness-75 opacity-60 mb-6 ob-fade-up invert" />
+						<span>B.</span>
 
 						<p className="text-[13px] sm:text-[14px] text-white/50 leading-[1.8] sm:leading-[1.85]">
 							Hey{firstName ? ` ${firstName}` : ""},
 						</p>
 
 						<p className="text-[13px] sm:text-[14px] text-white/50 leading-[1.8] sm:leading-[1.85] mt-4 ob-fade-up-d1">
-							Welcome to Better Hub. This is built by the team behind <a href="https://better-auth.com" target="_blank" rel="noopener noreferrer" className="text-white/70 underline underline-offset-2 decoration-white/20 hover:text-white/90 transition-colors">Better Auth</a>. We live on GitHub, we have our own frustrations, so we wanted to improve our own experience.
+							Welcome to Better Hub. This is built by the
+							team behind{" "}
+							<a
+								href="https://better-auth.com"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="text-white/70 underline underline-offset-2 decoration-white/20 hover:text-white/90 transition-colors"
+							>
+								Better Auth
+							</a>
+							. We spend a lot of our time on GitHub, so
+							we wanted to improve our own experience.
 						</p>
 
 						<p className="text-[13px] sm:text-[14px] text-white/50 leading-[1.8] sm:leading-[1.85] mt-4 ob-fade-up-d2">
-							We&apos;re trying to improve everything from the home page experience to repo overview, PR reviews, and AI integration. Faster and more pleasant overall. Still GitHub underneath. On desktop, most things are accessible through keyboard shortcuts. <kbd className="text-[11px] px-1 py-0.5 rounded-sm font-mono text-white/40">⌘K</kbd> opens the command center, <kbd className="text-[11px] px-1 py-0.5 rounded-sm font-mono text-white/40">⌘I</kbd> opens Ghost, our AI thing.
+							We&apos;re trying to improve everything from
+							the home page experience to repo overview,
+							PR reviews, and AI integration. Faster and
+							more pleasant overall. Still GitHub
+							underneath. On desktop, most things are
+							accessible through keyboard shortcuts.{" "}
+							<kbd className="text-[11px] px-1 py-0.5 rounded-sm font-mono text-white/40">
+								⌘K
+							</kbd>{" "}
+							opens the command center,{" "}
+							<kbd className="text-[11px] px-1 py-0.5 rounded-sm font-mono text-white/40">
+								⌘I
+							</kbd>{" "}
+							opens Ghost, a super helpful AI assistant.
 						</p>
 
 						<p className="text-[13px] sm:text-[14px] text-white/50 leading-[1.8] sm:leading-[1.85] mt-4 ob-fade-up-d3">
-							We&apos;re also trying new ideas like Prompt Requests, where teams and communities collaborate on a prompt and the actual implementation is made by an agent.
+							We&apos;re also trying new ideas like Prompt
+							Requests, where teams and communities
+							collaborate on a prompt and the actual
+							implementation is made by an agent.
 						</p>
 
 						<p className="text-[13px] sm:text-[14px] text-white/50 leading-[1.8] sm:leading-[1.85] mt-4 ob-fade-up-d4">

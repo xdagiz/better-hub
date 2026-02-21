@@ -1,95 +1,144 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./db";
+import { Octokit } from "@octokit/rest";
+import { redis } from "./redis";
+import { waitUntil } from "@vercel/functions";
+import { all } from "better-all";
+import { headers } from "next/headers";
+import { cache } from "react";
+import { createHash } from "@better-auth/utils/hash";
+
+async function getOctokitUser(token: string) {
+	const cached = await redis.get<ReturnType<(typeof octokit)["users"]["getAuthenticated"]>>(
+		`github_user:${token}`,
+	);
+	if (cached) return cached;
+	const octokit = new Octokit({ auth: token });
+	const githubUser = await octokit.users.getAuthenticated();
+	const hash = await createHash("SHA-256", "base64").digest(token);
+	waitUntil(redis.set(`github_user:${hash}`, JSON.stringify(githubUser.data)));
+	return githubUser;
+}
 
 export const auth = betterAuth({
 	database: prismaAdapter(prisma, {
 		provider: "postgresql",
 	}),
+	user: {
+		additionalFields: {
+			githubPat: {
+				type: "string",
+				required: false,
+			},
+			onboardingDone: {
+				type: "boolean",
+				required: false,
+			},
+		},
+	},
+	account: {
+		encryptOAuthTokens: true,
+		//cache the account in the cookie
+		storeAccountCookie: true,
+	},
 	socialProviders: {
 		github: {
 			clientId: process.env.GITHUB_CLIENT_ID!,
 			clientSecret: process.env.GITHUB_CLIENT_SECRET!,
 			scope: [
-				// Repository permissions
-				"repo", // Full control of private repositories
-				"repo:status", // Access commit status
-				"repo_deployment", // Access deployment status
-				"public_repo", // Access public repositories
+				"repo",
+				"repo:status",
+				"repo_deployment",
+				"public_repo",
 
-				// User permissions
-				"user", // Update ALL user data
-				"user:email", // Access user email addresses
-				"user:follow", // Follow and unfollow users
+				"user",
+				"user:email",
+				"user:follow",
 
-				// Organization permissions
-				"admin:org", // Full control of orgs and teams, read and write org projects
-				"write:org", // Read and write org membership, read and write org projects
-				"read:org", // Read org membership, read org projects
+				"admin:org",
+				"write:org",
+				"read:org",
 
-				// Public key permissions
-				"admin:public_key", // Full control of user public keys
-				"write:public_key", // Write user public keys
-				"read:public_key", // Read user public keys
+				"admin:repo_hook",
+				"write:repo_hook",
+				"read:repo_hook",
 
-				// Repository hook permissions
-				"admin:repo_hook", // Full control of repository hooks
-				"write:repo_hook", // Write repository hooks
-				"read:repo_hook", // Read repository hooks
+				"admin:org_hook",
 
-				// Organization hook permissions
-				"admin:org_hook", // Full control of organization hooks
+				"gist",
 
-				// Gist permissions
-				"gist", // Create gists
+				"notifications",
 
-				// Notification permissions
-				"notifications", // Access notifications
+				"admin:gpg_key",
+				"write:gpg_key",
+				"read:gpg_key",
 
-				// User GPG key permissions
-				"admin:gpg_key", // Full control of user GPG keys
-				"write:gpg_key", // Write user GPG keys
-				"read:gpg_key", // Read user GPG keys
+				"write:discussion",
+				"read:discussion",
 
-				// Discussion permissions
-				"write:discussion", // Read and write team discussions
-				"read:discussion", // Read team discussions
+				"security_events",
 
-				// Package permissions
-				"read:packages", // Download packages from GitHub Package Registry
-				"write:packages", // Upload packages to GitHub Package Registry
-				"delete:packages", // Delete packages from GitHub Package Registry
-
-				// Security events
-				"security_events", // Read and write security events
-
-				// Actions permissions
-				"workflow", // Update GitHub Action workflows
-
-				// Project permissions (classic)
-				"read:project", // Read access to project boards
-				"write:project", // Write access to project boards
-
-				// Enterprise permissions
-				"admin:enterprise", // Full control of enterprises
-				"manage_billing:enterprise", // Read and write enterprise billing data
-				"read:enterprise", // Read enterprise profile data
-
-				// Audit log permissions
-				"read:audit_log", // Read audit log events
-
-				// Copilot permissions
-				"copilot", // Access GitHub Copilot
-
-				// Codespace permissions
-				"codespace", // Full control of codespaces
+				"workflow",
+				"read:project",
+				"write:project",
+				"admin:enterprise",
+				"manage_billing:enterprise",
+				"read:enterprise",
+				"read:audit_log",
+				"copilot",
+				"codespace",
 			],
+			async mapProfileToUser(profile) {
+				return {
+					githubLogin: profile.login,
+				};
+			},
 		},
 	},
 	session: {
 		cookieCache: {
 			enabled: true,
-			maxAge: 60 * 60 * 24 * 7, // 7 days
+			maxAge: 60 * 60 * 24 * 7,
 		},
 	},
 });
+
+export const getServerSession = cache(async () => {
+	try {
+		const { session, account } = await all({
+			async session() {
+				const session = await auth.api.getSession({
+					headers: await headers(),
+				});
+				return session;
+			},
+			async account() {
+				const session = await auth.api.getAccessToken({
+					headers: await headers(),
+					body: { providerId: "github" },
+				});
+				return session;
+			},
+		});
+		if (!session || !account?.accessToken) {
+			return null;
+		}
+		const githubUser = await getOctokitUser(account.accessToken);
+		if (!githubUser?.data) {
+			return null;
+		}
+		return {
+			user: session.user,
+			session,
+			githubUser: {
+				...githubUser.data,
+				accessToken: account.accessToken,
+			},
+		};
+	} catch {
+		return null;
+	}
+});
+
+export type $Session = NonNullable<Awaited<ReturnType<typeof getServerSession>>>;

@@ -17,20 +17,7 @@ import { cn } from "@/lib/utils";
 import { toInternalUrl } from "@/lib/github-utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { CopyLinkButton } from "@/components/shared/copy-link-button";
-
-interface IssueItem {
-	id: number;
-	title: string;
-	html_url: string;
-	number: number;
-	state: string;
-	created_at: string;
-	updated_at: string;
-	repository_url: string;
-	user: { login: string; avatar_url: string } | null;
-	labels: Array<{ name?: string; color?: string }>;
-	comments: number;
-}
+import type { IssueItem } from "@/lib/github-types";
 
 type TabType = "assigned" | "created" | "mentioned";
 type SortType = "updated" | "newest" | "oldest";

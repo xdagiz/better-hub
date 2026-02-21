@@ -21,6 +21,7 @@ import {
 	ChevronDown,
 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
+import { getLanguageColor } from "@/lib/github-utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 
 interface Repo {
@@ -45,32 +46,12 @@ interface Repo {
 	};
 }
 
-const languageColors: Record<string, string> = {
-	TypeScript: "#3178c6",
-	JavaScript: "#f1e05a",
-	Python: "#3572A5",
-	Rust: "#dea584",
-	Go: "#00ADD8",
-	Java: "#b07219",
-	Ruby: "#701516",
-	Swift: "#F05138",
-	Kotlin: "#A97BFF",
-	"C++": "#f34b7d",
-	"C#": "#178600",
-	PHP: "#4F5D95",
-	Vue: "#41b883",
-	Svelte: "#ff3e00",
-	HTML: "#e34c26",
-	CSS: "#563d7c",
-	Shell: "#89e051",
-};
-
 type FilterType = "all" | "public" | "private" | "forks" | "archived";
 type SortType = "updated" | "name" | "stars";
 type ViewMode = "list" | "grid" | "grouped";
 
 function RepoRow({ repo, showOwner = true }: { repo: Repo; showOwner?: boolean }) {
-	const langColor = repo.language ? languageColors[repo.language] || "#8b949e" : null;
+	const langColor = repo.language ? getLanguageColor(repo.language) : null;
 
 	return (
 		<Link
@@ -173,7 +154,7 @@ function RepoRow({ repo, showOwner = true }: { repo: Repo; showOwner?: boolean }
 }
 
 function RepoCard({ repo }: { repo: Repo }) {
-	const langColor = repo.language ? languageColors[repo.language] || "#8b949e" : null;
+	const langColor = repo.language ? getLanguageColor(repo.language) : null;
 
 	return (
 		<Link
@@ -520,10 +501,9 @@ export function ReposContent({ repos }: { repos: Repo[] }) {
 											className="w-2 h-2 rounded-full shrink-0"
 											style={{
 												backgroundColor:
-													languageColors[
-														l
-													] ||
-													"#8b949e",
+													getLanguageColor(
+														l,
+													),
 											}}
 										/>
 										{l}

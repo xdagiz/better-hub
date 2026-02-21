@@ -15,6 +15,7 @@ import {
 	CircleDot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getLanguageColor } from "@/lib/github-utils";
 
 type SearchCategory = "code" | "repos" | "issues" | "prs" | "users";
 
@@ -25,26 +26,6 @@ const categories: { key: SearchCategory; label: string; icon: typeof Code }[] = 
 	{ key: "prs", label: "PRs", icon: GitPullRequest },
 	{ key: "users", label: "Users", icon: Users },
 ];
-
-const languageColors: Record<string, string> = {
-	TypeScript: "#3178c6",
-	JavaScript: "#f1e05a",
-	Python: "#3572A5",
-	Rust: "#dea584",
-	Go: "#00ADD8",
-	Java: "#b07219",
-	Ruby: "#701516",
-	Swift: "#F05138",
-	Kotlin: "#A97BFF",
-	"C++": "#f34b7d",
-	"C#": "#178600",
-	PHP: "#4F5D95",
-	Vue: "#41b883",
-	Svelte: "#ff3e00",
-	HTML: "#e34c26",
-	CSS: "#563d7c",
-	Shell: "#89e051",
-};
 
 const popularLanguages = [
 	"TypeScript",
@@ -301,14 +282,12 @@ function RepoResultItem({ item }: { item: RepoSearchItem }) {
 							<span className="flex items-center gap-1.5">
 								<span
 									className="w-2 h-2 rounded-full shrink-0"
-									style={{
-										backgroundColor:
-											languageColors[
-												item
-													.language
-											] ||
-											"#8b949e",
-									}}
+								style={{
+									backgroundColor:
+										getLanguageColor(
+											item.language,
+										),
+								}}
 								/>
 								{item.language}
 							</span>
@@ -737,13 +716,12 @@ export function SearchContent({
 							>
 								<span
 									className="w-2 h-2 rounded-full shrink-0"
-									style={{
-										backgroundColor:
-											languageColors[
-												lang
-											] ||
-											"#8b949e",
-									}}
+								style={{
+									backgroundColor:
+										getLanguageColor(
+											lang,
+										),
+								}}
 								/>
 								{lang}
 							</button>

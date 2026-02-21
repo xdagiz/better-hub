@@ -15,22 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
-
-interface NotificationItem {
-	id: string;
-	reason: string;
-	subject: {
-		title: string;
-		type: string;
-		url: string | null;
-	};
-	repository: {
-		full_name: string;
-		html_url: string;
-	};
-	updated_at: string;
-	unread: boolean;
-}
+import type { NotificationItem } from "@/lib/github-types";
 
 type FilterType = "all" | "unread" | "participating" | "mention";
 

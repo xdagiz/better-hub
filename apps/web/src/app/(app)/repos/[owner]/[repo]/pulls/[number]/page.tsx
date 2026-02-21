@@ -6,16 +6,9 @@ import {
 	extractRepoPermissions,
 	getOctokit,
 	fetchCheckStatusForRef,
-	getUser,
-	getUserPublicRepos,
-	getUserPublicOrgs,
-	getPersonRepoActivity,
-	getRepoContributors,
+	getCachedCheckStatus,
 	type CheckStatus,
-	type PRBundleData,
-	type PersonRepoActivity,
 } from "@/lib/github";
-import { computeContributorScore, type ScoreResult } from "@/lib/contributor-score";
 import { extractParticipants } from "@/lib/github-utils";
 import { highlightDiffLines, type SyntaxToken } from "@/lib/shiki";
 import { PRHeader } from "@/components/pr/pr-header";
@@ -31,26 +24,16 @@ import { PRMergePanel } from "@/components/pr/pr-merge-panel";
 import { PRCommentForm } from "@/components/pr/pr-comment-form";
 import { PRReviewForm } from "@/components/pr/pr-review-form";
 import { PRConflictResolver } from "@/components/pr/pr-conflict-resolver";
-import { PRAuthorDossier, type AuthorDossierData } from "@/components/pr/pr-author-dossier";
+import { LazyAuthorDossier } from "@/components/pr/pr-author-dossier-lazy";
+import { fetchAuthorDossier } from "../pr-actions";
 import { ChatPageActivator } from "@/components/shared/chat-page-activator";
 import { TrackView } from "@/components/shared/track-view";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { inngest } from "@/lib/inngest";
 import { isItemPinned } from "@/lib/pinned-items-store";
+import { all } from "better-all";
 
-type GitHubOrg = { login: string; avatar_url: string };
-type GitHubPublicRepo = {
-	name: string;
-	full_name: string;
-	stargazers_count: number;
-	language: string | null;
-};
-type GitHubUserProfile = {
-	followers: number;
-	public_repos: number;
-	created_at: string;
-};
 type GitHubPRFile = {
 	filename: string;
 	status: string;
@@ -76,12 +59,13 @@ export default async function PRDetailPage({
 	const sp = await searchParams;
 	const pullNumber = parseInt(numStr, 10);
 
-	const [bundle, files, repoData, currentUser] = await Promise.all([
-		getPullRequestBundle(owner, repo, pullNumber),
-		getPullRequestFiles(owner, repo, pullNumber),
-		getRepo(owner, repo),
-		getAuthenticatedUser(),
-	]);
+	const { bundle, files, repoData, currentUser, session } = await all({
+		bundle: () => getPullRequestBundle(owner, repo, pullNumber),
+		files: () => getPullRequestFiles(owner, repo, pullNumber),
+		repoData: () => getRepo(owner, repo),
+		currentUser: () => getAuthenticatedUser(),
+		session: async () => auth.api.getSession({ headers: await headers() }),
+	});
 
 	if (!bundle) {
 		return (
@@ -106,73 +90,28 @@ export default async function PRDetailPage({
 	const permissions = extractRepoPermissions(repoData ?? {});
 	const canWrite = permissions.push || permissions.admin || permissions.maintain;
 	const canTriage = canWrite || permissions.triage;
+	const isOpen = pr.state === "open" && !pr.merged_at;
 
-	// Fetch author dossier data in parallel (cached via local-first pattern)
-	const authorLogin = pr?.user?.login;
-	const [authorProfile, authorRepos, authorOrgs, authorActivity, contributors] = authorLogin
-		? await Promise.all([
-				getUser(authorLogin),
-				getUserPublicRepos(authorLogin, 6),
-				getUserPublicOrgs(authorLogin),
-				getPersonRepoActivity(owner, repo, authorLogin),
-				getRepoContributors(owner, repo),
-			])
-		: [
-				null,
-				[],
-				[],
-				{ commits: [], prs: [], issues: [], reviews: [] },
-				{ list: [], totalCount: 0 },
-			];
+	const { checkStatus: checkStatusResult, prPinned } = await all({
+		checkStatus: async () => {
+			if (!isOpen) return undefined;
+			const cached = await getCachedCheckStatus(owner, repo, pullNumber);
+			if (cached) return cached;
+			try {
+				const octokit = await getOctokit();
+				const cs = await fetchCheckStatusForRef(octokit, owner, repo, pr.head.sha);
+				return cs ?? undefined;
+			} catch {
+				return undefined;
+			}
+		},
+		prPinned: () =>
+			session?.user?.id
+				? isItemPinned(session.user.id, owner, repo, `/${owner}/${repo}/pulls/${pullNumber}`)
+				: Promise.resolve(false),
+	});
 
-	// Compute contributor score
-	const orgs = authorOrgs as GitHubOrg[];
-	const repos = authorRepos as GitHubPublicRepo[];
-	const activity = authorActivity as PersonRepoActivity;
-
-	const isOrgMember = orgs.some((o) => o.login?.toLowerCase() === owner.toLowerCase());
-	const contributorEntry = contributors.list?.find(
-		(c) => c.login?.toLowerCase() === authorLogin?.toLowerCase(),
-	);
-	const sortedAuthorRepos = [...repos]
-		.sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
-		.slice(0, 6);
-
-	let contributorScore: ScoreResult | null = null;
-	if (authorProfile && authorLogin) {
-		const profile = authorProfile as GitHubUserProfile;
-		contributorScore = computeContributorScore({
-			followers: profile.followers ?? 0,
-			publicRepos: profile.public_repos ?? 0,
-			accountCreated: profile.created_at ?? "",
-			commitsInRepo: activity.commits?.length ?? 0,
-			prsInRepo: (activity.prs ?? []).map((p) => ({ state: p.state })),
-			reviewsInRepo: activity.reviews?.length ?? 0,
-			isContributor: !!contributorEntry,
-			contributionCount: contributorEntry?.contributions ?? 0,
-			isOrgMember,
-			isOwner: authorLogin?.toLowerCase() === owner.toLowerCase(),
-			topRepoStars: sortedAuthorRepos.map((r) => r.stargazers_count ?? 0),
-		});
-	}
-
-	// Fetch check status for open PRs
-	let checkStatus: CheckStatus | undefined;
-	if (pr && pr.state === "open" && !pr.merged_at) {
-		try {
-			const octokit = await getOctokit();
-			const cs = await fetchCheckStatusForRef(octokit, owner, repo, pr.head.sha);
-			if (cs) checkStatus = cs;
-		} catch {
-			// Ignore check status errors
-		}
-	}
-
-	// Fetch session unconditionally (used for embedding trigger + pin status)
-	const session = await auth.api.getSession({ headers: await headers() });
-	const prPinned = session?.user?.id
-		? await isItemPinned(session.user.id, owner, repo, `/${owner}/${repo}/pulls/${pullNumber}`)
-		: false;
+	const checkStatus = checkStatusResult as CheckStatus | undefined;
 
 	// Fire-and-forget: embed PR content for semantic search
 	if (session?.user?.id) {
@@ -320,7 +259,6 @@ export default async function PRDetailPage({
 		);
 	}
 
-	const isOpen = pr.state === "open" && !pr.merged_at;
 	const showConflictResolver = sp.resolve === "conflicts" && isOpen;
 	const headSha = pr.head.sha;
 	const headBranch = pr.head.ref;
@@ -543,50 +481,17 @@ export default async function PRDetailPage({
 				}
 				conversationPanel={
 					<>
-						{authorProfile && (
-							<PRAuthorDossier
-								author={
-									authorProfile as AuthorDossierData
-								}
-								orgs={orgs.map((o) => ({
-									login: o.login,
-									avatar_url: o.avatar_url,
-								}))}
-								topRepos={sortedAuthorRepos
-									.slice(0, 3)
-									.map((r) => ({
-										name: r.name,
-										full_name: r.full_name,
-										stargazers_count:
-											r.stargazers_count ??
-											0,
-										language: r.language,
-									}))}
-								isOrgMember={isOrgMember}
-								score={contributorScore}
-								contributionCount={
-									contributorEntry?.contributions ??
-									0
-								}
-								repoActivity={{
-									commits:
-										activity.commits
-											?.length ??
-										0,
-									prs:
-										activity.prs
-											?.length ??
-										0,
-									reviews:
-										activity.reviews
-											?.length ??
-										0,
-									issues:
-										activity.issues
-											?.length ??
-										0,
-								}}
+						{pr.user?.login && (
+							<LazyAuthorDossier
+								owner={owner}
+								repo={repo}
+								authorLogin={pr.user.login}
 								openedAt={pr.created_at}
+								onFetch={
+									fetchAuthorDossier as unknown as Parameters<
+										typeof LazyAuthorDossier
+									>[0]["onFetch"]
+								}
 							/>
 						)}
 						<PRConversation

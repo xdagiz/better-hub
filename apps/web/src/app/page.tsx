@@ -1,71 +1,11 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { getServerSession } from "@/lib/auth";
 import Image from "next/image";
 import { HalftoneBackground } from "@/components/ui/halftone-background";
-import { AgentIcon } from "@/components/ui/agent-icon";
 import { LoginButton } from "@/components/login-button";
 
-function KeyboardIcon({ className }: { className?: string }) {
-	return (
-		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
-			<path
-				fill="none"
-				stroke="currentColor"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				strokeWidth="2"
-				d="M2 8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm4 2v.01m4-.01v.01m4-.01v.01m4-.01v.01M6 14v.01M18 14v.01M10 14l4 .01"
-			/>
-		</svg>
-	);
-}
-
-function ZapIcon({ className }: { className?: string }) {
-	return (
-		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
-			<path
-				fill="none"
-				stroke="currentColor"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				strokeWidth="1.5"
-				d="M12.748 3.572c.059-.503-.532-.777-.835-.388L4.111 13.197c-.258.33-.038.832.364.832h6.988c.285 0 .506.267.47.57l-.68 5.83c-.06.502.53.776.834.387l7.802-10.013c.258-.33.038-.832-.364-.832h-6.988c-.285 0-.506-.267-.47-.57z"
-			/>
-		</svg>
-	);
-}
-
-function GithubIcon({ className }: { className?: string }) {
-	return (
-		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
-			<path
-				fill="currentColor"
-				d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489c.5.092.682-.217.682-.482c0-.237-.008-.866-.013-1.7c-2.782.603-3.369-1.342-3.369-1.342c-.454-1.155-1.11-1.462-1.11-1.462c-.908-.62.069-.608.069-.608c1.003.07 1.531 1.03 1.531 1.03c.892 1.529 2.341 1.087 2.91.832c.092-.647.35-1.088.636-1.338c-2.22-.253-4.555-1.11-4.555-4.943c0-1.091.39-1.984 1.029-2.683c-.103-.253-.446-1.27.098-2.647c0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025c.546 1.377.203 2.394.1 2.647c.64.699 1.028 1.592 1.028 2.683c0 3.842-2.339 4.687-4.566 4.935c.359.309.678.919.678 1.852c0 1.336-.012 2.415-.012 2.743c0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10"
-			/>
-		</svg>
-	);
-}
-
-function ArrowRightIcon({ className }: { className?: string }) {
-	return (
-		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
-			<path
-				fill="none"
-				stroke="currentColor"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				strokeWidth="2"
-				d="M5 12h14m-7-7l7 7l-7 7"
-			/>
-		</svg>
-	);
-}
-
-export default async function LoginPage() {
-	const session = await auth.api.getSession({
-		headers: await headers(),
-	});
+export default async function HomePage() {
+	const session = await getServerSession();
 
 	if (session) {
 		redirect("/dashboard");
@@ -73,14 +13,12 @@ export default async function LoginPage() {
 
 	return (
 		<div className="min-h-screen bg-background flex">
-			{/* Left — Shader hero */}
 			<div
 				className="hidden lg:flex flex-1 relative overflow-hidden"
 				style={{ background: "var(--shader-bg)" }}
 			>
 				<HalftoneBackground />
 
-				{/* Branding overlay */}
 				<div className="relative z-10 flex flex-col justify-end p-10 w-full h-full gap-8">
 					<div className="absolute top-5 left-10 flex items-center gap-3">
 						<span className="text-xl tracking-tight text-foreground">
@@ -90,105 +28,44 @@ export default async function LoginPage() {
 
 					<div className="max-w-md">
 						<h1 className="text-4xl font-medium tracking-tight text-foreground leading-[1.15]">
-							Reimagining code
+							Re-imagining code
 							<br />
 							collaboration.
 						</h1>
-						<svg
-							viewBox="0 0 320 14"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
-							className="w-72 mt-2"
-						>
-							<path
-								d="M2 10 C60 9, 160 5, 318 2"
-								stroke="currentColor"
-								strokeWidth="0.8"
-								strokeLinecap="round"
-								className="text-foreground/20"
-							/>
-							<path
-								d="M2 12.5 C80 11, 180 6.5, 318 4"
-								stroke="currentColor"
-								strokeWidth="0.8"
-								strokeLinecap="round"
-								className="text-foreground/20"
-							/>
-						</svg>
+
 						<p className="text-foreground/55 text-sm leading-relaxed mt-4 max-w-sm">
 							A better place to collaborate on code — for
-							humans and agents.
+							humans and agents
 						</p>
-
-						<div className="flex items-center gap-6 mt-8">
-							<div className="flex items-center gap-2 text-foreground/50">
-								<KeyboardIcon className="w-3.5 h-3.5" />
-								<span className="text-[11px] font-mono">
-									Keyboard-first
-								</span>
-							</div>
-							<div className="flex items-center gap-2 text-foreground/50">
-								<ZapIcon className="w-3.5 h-3.5" />
-								<span className="text-[11px] font-mono">
-									Instant
-								</span>
-							</div>
-							<div className="flex items-center gap-2 text-foreground/50">
-								<AgentIcon className="w-4 h-4" />
-								<span className="text-[11px] font-mono">
-									Agentic
-								</span>
-							</div>
-						</div>
 					</div>
 
-					{/* Dashboard preview — fanned cards */}
 					<div className="relative w-full max-w-2xl h-72 xl:h-80">
-						{/* Back card (dash2) — rotated and offset to the left */}
 						<div className="absolute inset-0 -rotate-2 -translate-x-6 -translate-y-2 origin-bottom-right">
 							<div className="rounded-lg border border-foreground/6 overflow-hidden shadow-xl shadow-black/10 opacity-70">
-								<Image
-									src="/dash2-light.webp"
-									alt="Repository view"
-									width={1509}
-									height={851}
-									priority
-									className="w-full h-auto block dark:hidden"
-								/>
 								<Image
 									src="/dash2.webp"
 									alt="Repository view"
 									width={1508}
 									height={852}
 									priority
-									className="w-full h-auto hidden dark:block"
+									className="w-full h-auto"
 								/>
 							</div>
 						</div>
 
-						{/* Front card — slight counter-rotation */}
 						<div className="absolute inset-0 rotate-1 origin-bottom-right z-10">
 							<div className="rounded-lg border border-foreground/8 overflow-hidden shadow-2xl shadow-black/20">
-								<Image
-									src="/dash1-light.webp"
-									alt="Dashboard preview"
-									width={1504}
-									height={849}
-									priority
-									className="w-full h-auto block dark:hidden"
-								/>
 								<Image
 									src="/dash1.webp"
 									alt="Dashboard preview"
 									width={1508}
 									height={854}
 									priority
-									className="w-full h-auto hidden dark:block"
+									className="w-full h-auto"
 								/>
 							</div>
 						</div>
 
-						{/* Fade-out gradient — short, only at the very bottom */}
 						<div
 							className="absolute inset-x-0 -bottom-10 h-1/3 pointer-events-none z-20"
 							style={{
@@ -199,13 +76,11 @@ export default async function LoginPage() {
 				</div>
 			</div>
 
-			{/* Right — Login */}
 			<div
 				className="flex-1 flex items-center justify-center p-8 lg:max-w-xl"
 				style={{ borderLeft: "1px solid var(--hero-border)" }}
 			>
 				<div className="w-full max-w-sm">
-					{/* Mobile logo */}
 					<div className="lg:hidden mb-12">
 						<Image
 							src="/logo.svg"
@@ -228,8 +103,9 @@ export default async function LoginPage() {
 					<LoginButton />
 
 					<p className="text-[11px] text-foreground/50 mt-2">
-						We&apos;ll request read access to your repos, PRs
-						&amp; notifications.
+						We&apos;ll request access to read and write to your
+						repositories and other resources. Your access token
+						is encrypted and stored securely.
 					</p>
 				</div>
 			</div>

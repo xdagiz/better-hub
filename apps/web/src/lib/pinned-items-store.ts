@@ -19,7 +19,6 @@ export async function getPinnedItems(
 	const rows = await prisma.pinnedItem.findMany({
 		where: { userId, owner, repo },
 		orderBy: { pinnedAt: "desc" },
-		cacheStrategy: { swr: 10 },
 	});
 	return rows;
 }
@@ -32,7 +31,6 @@ export async function getPinnedItemUrls(
 	const rows = await prisma.pinnedItem.findMany({
 		where: { userId, owner, repo },
 		select: { url: true },
-		cacheStrategy: { swr: 10 },
 	});
 	return rows.map((r) => r.url);
 }
@@ -77,7 +75,6 @@ export async function isItemPinned(
 	const row = await prisma.pinnedItem.findFirst({
 		where: { userId, owner, repo, url },
 		select: { id: true },
-		cacheStrategy: { swr: 10 },
 	});
 	return !!row;
 }

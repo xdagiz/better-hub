@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
-import Script from "next/script";
 import { generateThemeScript } from "@/lib/theme-script";
 import { listThemes } from "@/lib/themes";
 
@@ -24,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
 	title: "Better Hub",
-	description: "GitHub, rethought. A better way to manage your code.",
+	description: "Re-imagining code collaboration for humans and agents.",
 };
 
 export default function RootLayout({
@@ -40,13 +39,6 @@ export default function RootLayout({
 						__html: generateThemeScript(listThemes()),
 					}}
 				/>
-				{/* {process.env.NODE_ENV === "development" && (
-					<Script
-						src="//unpkg.com/react-grab/dist/index.global.js"
-						crossOrigin="anonymous"
-						strategy="beforeInteractive"
-					/>
-				)} */}
 			</head>
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} antialiased`}

@@ -29,13 +29,12 @@ export async function getCustomThemes(userId: string): Promise<CustomCodeTheme[]
 	const rows = await prisma.customCodeTheme.findMany({
 		where: { userId },
 		orderBy: { createdAt: "desc" },
-		cacheStrategy: { swr: 60 },
 	});
 	return rows.map(toTheme);
 }
 
 export async function getCustomTheme(id: string): Promise<CustomCodeTheme | null> {
-	const row = await prisma.customCodeTheme.findUnique({ where: { id }, cacheStrategy: { swr: 60 } });
+	const row = await prisma.customCodeTheme.findUnique({ where: { id } });
 	return row ? toTheme(row) : null;
 }
 

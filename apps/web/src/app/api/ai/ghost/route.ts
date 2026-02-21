@@ -4,7 +4,7 @@ import { convertToModelMessages, stepCountIs, streamText, tool } from "ai";
 import { z } from "zod";
 import { getOctokitFromSession, getGitHubToken } from "@/lib/ai-auth";
 import type { Octokit } from "@octokit/rest";
-import { Sandbox } from "@vercel/sandbox";
+import { Daytona, type Sandbox } from "@daytonaio/sdk";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { embedText } from "@/lib/mixedbread";
@@ -2829,25 +2829,7 @@ function getSandboxTools(octokit: Octokit, githubToken: string, commitAuthor?: C
 	let repoOwner: string | null = null;
 	let repoName: string | null = null;
 	let defaultBranch: string | null = null;
-
-	// Helper: run a shell command in the Vercel Sandbox and return { stdout, stderr, exitCode }
-	async function runShell(
-		sbx: Sandbox,
-		command: string,
-		opts?: { cwd?: string; timeout?: number },
-	) {
-		const result = await sbx.runCommand({
-			cmd: "bash",
-			args: ["-c", command],
-			cwd: opts?.cwd,
-			signal: AbortSignal.timeout(opts?.timeout ?? 120_000),
-		});
-		return {
-			exitCode: result.exitCode,
-			stdout: await result.stdout(),
-			stderr: await result.stderr(),
-		};
-	}
+	const daytona = new Daytona();
 
 	return {
 		startSandbox: tool({
@@ -2886,7 +2868,7 @@ The sandbox has git, node, npm, python, and common dev tools.
 
 				// Make idempotent — kill existing sandbox if any
 				if (sandbox) {
-					await sandbox.stop().catch(() => {});
+					await sandbox.delete().catch(() => {});
 					sandbox = null;
 					repoPath = null;
 					repoOwner = null;
@@ -2895,9 +2877,9 @@ The sandbox has git, node, npm, python, and common dev tools.
 				}
 
 				try {
-					sandbox = await Sandbox.create({
-						timeout: 10 * 60 * 1000,
-						runtime: "node24",
+					sandbox = await daytona.create({
+						language: "typescript",
+						autoStopInterval: 10,
 					});
 				} catch (e: unknown) {
 					sandbox = null;
@@ -2907,32 +2889,26 @@ The sandbox has git, node, npm, python, and common dev tools.
 				}
 
 				try {
-					// Read-only git config — no credential helper for push
-					await runShell(
-						sandbox,
+					// Git config
+					await sandbox.process.executeCommand(
 						`git config --global user.name "${commitAuthor?.name ?? "Ghost"}" && git config --global user.email "${commitAuthor?.email ?? "ghost@better-github.app"}"`,
 					);
 
-					repoPath = `/vercel/sandbox/${repo}`;
+					repoPath = `/home/daytona/${repo}`;
 					repoOwner = owner;
 					repoName = repo;
 
-					// Full clone (no shallow) — use token in URL for private repo access
-					const cloneUrl = `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`;
-					const cloneCmd = branch
-						? `git clone --branch ${branch} ${cloneUrl} ${repoPath}`
-						: `git clone ${cloneUrl} ${repoPath}`;
-					const cloneResult = await runShell(sandbox, cloneCmd);
-
-					if (cloneResult.exitCode !== 0) {
-						await sandbox.stop().catch(() => {});
-						sandbox = null;
-						return {
-							error: `Clone failed: ${cloneResult.stderr}`,
-						};
-					}
+					// Clone via built-in git support
+					await sandbox.git.clone(
+						`https://github.com/${owner}/${repo}.git`,
+						repoPath,
+						branch || undefined,
+						undefined,
+						"x-access-token",
+						githubToken,
+					);
 				} catch (e: unknown) {
-					if (sandbox) await sandbox.stop().catch(() => {});
+					if (sandbox) await sandbox.delete().catch(() => {});
 					sandbox = null;
 					return {
 						error: `Clone error: ${e instanceof Error ? e.message : "unknown"}`,
@@ -2941,17 +2917,14 @@ The sandbox has git, node, npm, python, and common dev tools.
 
 				try {
 					const [branchResult, lsResult] = await Promise.all([
-						runShell(
-							sandbox,
+						sandbox.process.executeCommand(
 							"git rev-parse --abbrev-ref HEAD",
-							{
-								cwd: repoPath,
-							},
+							repoPath,
 						),
-						runShell(sandbox, "ls -1", { cwd: repoPath }),
+						sandbox.process.executeCommand("ls -1", repoPath),
 					]);
-					defaultBranch = branchResult.stdout.trim();
-					const topLevelFiles = lsResult.stdout
+					defaultBranch = branchResult.result.trim();
+					const topLevelFiles = lsResult.result
 						.trim()
 						.split("\n")
 						.filter(Boolean);
@@ -2982,9 +2955,9 @@ The sandbox has git, node, npm, python, and common dev tools.
 
 					if (hasPkgJson) {
 						try {
-							const buf = await sandbox.readFileToBuffer({
-								path: `${repoPath}/package.json`,
-							});
+							const buf = await sandbox.fs.downloadFile(
+								`${repoPath}/package.json`,
+							);
 							if (buf) {
 								const pkg = JSON.parse(
 									buf.toString(),
@@ -3007,7 +2980,7 @@ The sandbox has git, node, npm, python, and common dev tools.
 
 					return {
 						success: true,
-						sandboxId: sandbox.sandboxId,
+						sandboxId: sandbox.id,
 						repoPath,
 						branch: defaultBranch,
 						packageManager,
@@ -3020,7 +2993,7 @@ The sandbox has git, node, npm, python, and common dev tools.
 				} catch {
 					return {
 						success: true,
-						sandboxId: sandbox.sandboxId,
+						sandboxId: sandbox.id,
 						repoPath,
 						branch: defaultBranch || "main",
 						packageManager: "npm",
@@ -3047,7 +3020,7 @@ The sandbox has git, node, npm, python, and common dev tools.
 					.number()
 					.optional()
 					.describe(
-						"Timeout in ms (default 120000, use 300000 for installs/builds)",
+						"Timeout in seconds (default 120, use 300 for installs/builds)",
 					),
 			}),
 			execute: async ({ command, cwd, timeout }) => {
@@ -3056,36 +3029,28 @@ The sandbox has git, node, npm, python, and common dev tools.
 						error: "No sandbox running. Use startSandbox first.",
 					};
 				try {
-					const result = await runShell(sandbox, command, {
-						cwd: cwd || repoPath || undefined,
-						timeout: timeout ?? 120_000,
-					});
+					const result = await sandbox.process.executeCommand(
+						command,
+						cwd || repoPath || undefined,
+						undefined,
+						timeout ?? 120,
+					);
 					// Truncate large output — keep the tail where errors usually appear
 					const maxLen = 8000;
 					const stdout =
-						result.stdout.length > maxLen
-							? `...(truncated ${result.stdout.length - maxLen} chars)...\n` +
-								result.stdout.slice(-maxLen)
-							: result.stdout;
-					const stderr =
-						result.stderr.length > maxLen
-							? `...(truncated)...\n` +
-								result.stderr.slice(-maxLen)
-							: result.stderr;
+						result.result.length > maxLen
+							? `...(truncated ${result.result.length - maxLen} chars)...\n` +
+								result.result.slice(-maxLen)
+							: result.result;
 
 					if (result.exitCode !== 0) {
-						const errMsg =
-							stderr.trim() ||
-							stdout.trim() ||
-							`exit code ${result.exitCode}`;
 						return {
-							error: errMsg,
+							error: stdout.trim() || `exit code ${result.exitCode}`,
 							exitCode: result.exitCode,
 							stdout,
-							stderr,
 						};
 					}
-					return { success: true, stdout, stderr, exitCode: 0 };
+					return { success: true, stdout, exitCode: 0 };
 				} catch (e: unknown) {
 					return {
 						error:
@@ -3115,9 +3080,7 @@ The sandbox has git, node, npm, python, and common dev tools.
 					const absPath = path.startsWith("/")
 						? path
 						: `${repoPath}/${path}`;
-					const buf = await sandbox.readFileToBuffer({
-						path: absPath,
-					});
+					const buf = await sandbox.fs.downloadFile(absPath);
 					if (!buf) return { error: `File not found: ${absPath}` };
 					const content = buf.toString();
 					if (content.length > 30000) {
@@ -3159,9 +3122,10 @@ The sandbox has git, node, npm, python, and common dev tools.
 					const absPath = path.startsWith("/")
 						? path
 						: `${repoPath}/${path}`;
-					await sandbox.writeFiles([
-						{ path: absPath, content: Buffer.from(content) },
-					]);
+					await sandbox.fs.uploadFile(
+						Buffer.from(content),
+						absPath,
+					);
 					return { success: true, path: absPath };
 				} catch (e: unknown) {
 					return {
@@ -3180,7 +3144,7 @@ The sandbox has git, node, npm, python, and common dev tools.
 				if (!sandbox)
 					return { success: true, message: "No sandbox running." };
 				try {
-					await sandbox.stop();
+					await sandbox.delete();
 					sandbox = null;
 					repoPath = null;
 					return { success: true, message: "Sandbox terminated." };

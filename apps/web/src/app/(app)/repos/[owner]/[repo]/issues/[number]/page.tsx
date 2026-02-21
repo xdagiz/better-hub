@@ -6,10 +6,12 @@ import {
 	getAuthenticatedUser,
 } from "@/lib/github";
 import { extractParticipants } from "@/lib/github-utils";
+import { renderMarkdownToHtml } from "@/components/shared/markdown-renderer";
 import { IssueHeader } from "@/components/issue/issue-header";
 import { IssueDetailLayout } from "@/components/issue/issue-detail-layout";
 import { ChatPageActivator } from "@/components/shared/chat-page-activator";
 import { IssueConversation, type IssueTimelineEntry } from "@/components/issue/issue-conversation";
+import { IssueCommentsClient, type IssueComment } from "@/components/issue/issue-comments-client";
 import { IssueCommentForm } from "@/components/issue/issue-comment-form";
 import { IssueSidebar } from "@/components/issue/issue-sidebar";
 import { IssueParticipants } from "@/components/issue/issue-participants";
@@ -26,15 +28,6 @@ export default async function IssueDetailPage({
 }) {
 	const { owner, repo, number: numStr } = await params;
 	const issueNumber = parseInt(numStr, 10);
-
-	type IssueComment = {
-		id: number;
-		body?: string | null;
-		user: { login: string; avatar_url: string; type?: string } | null;
-		created_at: string;
-		author_association?: string;
-		reactions?: Record<string, unknown>;
-	};
 
 	const [issue, rawComments, repoData, linkedPRs, currentUser] = await Promise.all([
 		getIssue(owner, repo, issueNumber),
@@ -95,25 +88,30 @@ export default async function IssueDetailPage({
 		createdAt: c.created_at,
 	}));
 
-	// Build timeline: issue body as first entry, then comments
+	// Pre-render markdown for description and initial comments
+	const issueRefCtx = { owner, repo };
+	const [descriptionHtml, ...commentHtmls] = await Promise.all([
+		issue.body ? renderMarkdownToHtml(issue.body, undefined, issueRefCtx) : Promise.resolve(""),
+		...(comments || []).map((c) =>
+			c.body ? renderMarkdownToHtml(c.body, undefined, issueRefCtx) : Promise.resolve(""),
+		),
+	]);
+
+	const commentsWithHtml: IssueComment[] = (comments || []).map((c, i) => ({
+		...c,
+		bodyHtml: commentHtmls[i],
+	}));
+
 	const descriptionEntry: IssueTimelineEntry = {
 		type: "description",
 		id: "description",
 		user: issue.user,
 		body: issue.body || "",
+		bodyHtml: descriptionHtml,
 		created_at: issue.created_at,
 		reactions:
 			(issue as { reactions?: Record<string, unknown> }).reactions ?? undefined,
 	};
-	const commentEntries: IssueTimelineEntry[] = (comments || []).map((c) => ({
-		type: "comment" as const,
-		id: c.id,
-		user: c.user,
-		body: c.body || "",
-		created_at: c.created_at,
-		author_association: c.author_association,
-		reactions: c.reactions ?? undefined,
-	}));
 	// Extract participants
 	const participants = extractParticipants([
 		issue.user ? { login: issue.user.login, avatar_url: issue.user.avatar_url } : null,
@@ -167,18 +165,12 @@ export default async function IssueDetailPage({
 				}
 				panelHeader={<IssueParticipants participants={participants} />}
 				conversationPanel={
-					commentEntries.length > 0 ? (
-						<IssueConversation
-							entries={commentEntries}
-							owner={owner}
-							repo={repo}
-							issueNumber={issueNumber}
-						/>
-					) : (
-						<div className="flex items-center justify-center py-8 text-[11px] font-mono text-muted-foreground/30">
-							No comments yet
-						</div>
-					)
+				<IssueCommentsClient
+					owner={owner}
+					repo={repo}
+					issueNumber={issueNumber}
+					initialComments={commentsWithHtml}
+				/>
 				}
 				commentForm={
 					<IssueCommentForm

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
+import { authClient } from "./lib/auth-client";
 
 const publicPaths = ["/", "/api/auth", "/api/inngest"];
 
@@ -19,7 +20,7 @@ const APP_ROUTES = new Set([
 	"_next",
 ]);
 
-export default function middleware(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 	const segments = pathname.split("/").filter(Boolean);
 
@@ -29,7 +30,7 @@ export default function middleware(request: NextRequest) {
 	);
 	if (isPublic) return NextResponse.next();
 
-	const sessionCookie = getSessionCookie(request);
+	const sessionCookie = getSessionCookie(request.headers);
 	if (!sessionCookie) {
 		return NextResponse.redirect(new URL("/", request.url));
 	}
@@ -77,5 +78,5 @@ export default function middleware(request: NextRequest) {
 }
 
 export const config = {
-	matcher: ["/((?!api|_next/static|_next/image|favicon\\.ico|.*\\..*).*)"],
+	matcher: ["/((?!api|_next/static|_next/image|favicon\\.ico|[^/]+\\.[^/]+$).*)"],
 };

@@ -13,7 +13,7 @@ interface RepoNavProps {
 	openIssuesCount?: number;
 	openPrsCount?: number;
 	activeRunsCount?: number;
-	promptRequestsCount?: number;
+
 	showPeopleTab?: boolean;
 }
 
@@ -23,7 +23,7 @@ export function RepoNav({
 	openIssuesCount,
 	openPrsCount,
 	activeRunsCount,
-	promptRequestsCount,
+
 	showPeopleTab,
 }: RepoNavProps) {
 	const pathname = usePathname();
@@ -31,14 +31,21 @@ export function RepoNav({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [indicator, setIndicator] = useState({ left: 0, width: 0 });
 	const [hasAnimated, setHasAnimated] = useState(false);
-	const [countAdjustments, setCountAdjustments] = useState({ prs: 0, issues: 0, prompts: 0 });
+	const [countAdjustments, setCountAdjustments] = useState({ prs: 0, issues: 0 });
 
 	useEffect(() => {
-		setCountAdjustments({ prs: 0, issues: 0, prompts: 0 });
-	}, [openPrsCount, openIssuesCount, promptRequestsCount]);
+		setCountAdjustments({ prs: 0, issues: 0 });
+	}, [openPrsCount, openIssuesCount]);
 
 	useMutationSubscription(
-		["pr:merged", "pr:closed", "pr:reopened", "issue:closed", "issue:reopened", "issue:created", "prompt:created", "prompt:rejected"],
+		[
+			"pr:merged",
+			"pr:closed",
+			"pr:reopened",
+			"issue:closed",
+			"issue:reopened",
+			"issue:created",
+		],
 		(event: MutationEvent) => {
 			if (!isRepoEvent(event, owner, repo)) return;
 			setCountAdjustments((prev) => {
@@ -53,10 +60,6 @@ export function RepoNav({
 					case "issue:reopened":
 					case "issue:created":
 						return { ...prev, issues: prev.issues + 1 };
-					case "prompt:created":
-						return { ...prev, prompts: prev.prompts + 1 };
-					case "prompt:rejected":
-						return { ...prev, prompts: prev.prompts - 1 };
 					default:
 						return prev;
 				}
@@ -98,12 +101,6 @@ export function RepoNav({
 			href: `${base}/issues`,
 			active: pathname.startsWith(`${base}/issues`),
 			count: (openIssuesCount ?? 0) + countAdjustments.issues,
-		},
-		{
-			label: "Prompts",
-			href: `${base}/prompts`,
-			active: pathname.startsWith(`${base}/prompts`),
-			count: (promptRequestsCount ?? 0) + countAdjustments.prompts,
 		},
 		...(showPeopleTab
 			? [
@@ -151,7 +148,11 @@ export function RepoNav({
 				left: activeEl.offsetLeft,
 				width: activeEl.offsetWidth,
 			});
-			activeEl.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+			activeEl.scrollIntoView({
+				block: "nearest",
+				inline: "center",
+				behavior: "smooth",
+			});
 			if (!hasAnimated) setHasAnimated(true);
 		}
 	}, [hasAnimated]);
@@ -161,7 +162,10 @@ export function RepoNav({
 	}, [pathname, updateIndicator]);
 
 	return (
-		<div ref={containerRef} className="relative flex items-center gap-1 pt-2 pb-0 overflow-x-auto no-scrollbar">
+		<div
+			ref={containerRef}
+			className="relative flex items-center gap-1 pt-2 pb-0 overflow-x-auto no-scrollbar"
+		>
 			{tabs.map((tab) => (
 				<Link
 					key={tab.label}

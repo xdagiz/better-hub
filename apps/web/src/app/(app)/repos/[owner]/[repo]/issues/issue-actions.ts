@@ -1,8 +1,29 @@
 "use server";
 
-import { getOctokit, invalidateIssueCache } from "@/lib/github";
+import { getOctokit, getIssueComments, invalidateIssueCache } from "@/lib/github";
+import { renderMarkdownToHtml } from "@/components/shared/markdown-renderer";
 import { getErrorMessage } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
+
+export async function fetchIssueComments(
+	owner: string,
+	repo: string,
+	issueNumber: number,
+) {
+	const comments = await getIssueComments(owner, repo, issueNumber);
+	if (!Array.isArray(comments)) return comments;
+
+	const withHtml = await Promise.all(
+		comments.map(async (c: Record<string, unknown>) => {
+			const body = (c.body as string) || "";
+			const bodyHtml = body
+				? await renderMarkdownToHtml(body, undefined, { owner, repo })
+				: "";
+			return { ...c, bodyHtml };
+		}),
+	);
+	return withHtml;
+}
 
 export async function addIssueComment(
 	owner: string,

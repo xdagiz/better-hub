@@ -24,135 +24,34 @@ import {
 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
-import { toInternalUrl } from "@/lib/github-utils";
+import { toInternalUrl, getLanguageColor } from "@/lib/github-utils";
 import { RecentlyViewed } from "./recently-viewed";
 import { CreateRepoDialog } from "@/components/repo/create-repo-dialog";
+import type {
+	IssueItem,
+	RepoItem,
+	NotificationItem,
+	ActivityEvent,
+	TrendingRepoItem,
+	GitHubUser,
+	SearchResult,
+} from "@/lib/github-types";
 
 interface DashboardContentProps {
-	user: {
-		login: string;
-		avatar_url: string;
-		name: string | null;
-		public_repos: number;
-		followers: number;
-		following: number;
-	};
-	reviewRequests: { items: Array<IssueItem>; total_count: number };
-	myOpenPRs: { items: Array<IssueItem>; total_count: number };
-	myIssues: { items: Array<IssueItem>; total_count: number };
+	user: GitHubUser;
+	reviewRequests: SearchResult<IssueItem>;
+	myOpenPRs: SearchResult<IssueItem>;
+	myIssues: SearchResult<IssueItem>;
 	repos: Array<RepoItem>;
 	notifications: Array<NotificationItem>;
-	contributions: {
-		totalContributions: number;
-		weeks: Array<{
-			contributionDays: Array<{
-				contributionCount: number;
-				date: string;
-				color: string;
-			}>;
-		}>;
-	} | null;
 	activity: Array<ActivityEvent>;
 	trending: Array<TrendingRepoItem>;
-}
-
-interface ActivityEvent {
-	id: string;
-	type: string | null;
-	repo: { name: string };
-	created_at: string | null;
-	payload: {
-		action?: string;
-		ref?: string | null;
-		ref_type?: string;
-		commits?: Array<{ message: string; sha: string }>;
-		pull_request?: { title: string; number: number; merged?: boolean };
-		issue?: { title: string; number: number };
-		comment?: { body: string };
-		size?: number;
-		release?: { tag_name?: string; name?: string };
-		member?: { login?: string };
-	};
-}
-
-interface IssueItem {
-	id: number;
-	title: string;
-	html_url: string;
-	number: number;
-	state: string;
-	created_at: string;
-	updated_at: string;
-	repository_url: string;
-	user: { login: string; avatar_url: string } | null;
-	labels: Array<{ name?: string; color?: string }>;
-	draft?: boolean;
-	pull_request?: { merged_at: string | null };
-	comments: number;
-}
-
-interface RepoItem {
-	id: number;
-	name: string;
-	full_name: string;
-	description: string | null;
-	html_url: string;
-	stargazers_count: number;
-	forks_count: number;
-	language: string | null;
-	updated_at: string | null;
-	visibility?: string;
-	private: boolean;
-	open_issues_count: number;
-	owner: { login: string; avatar_url: string };
-}
-
-interface NotificationItem {
-	id: string;
-	reason: string;
-	subject: { title: string; type: string };
-	repository: { full_name: string };
-	updated_at: string;
-	unread: boolean;
-}
-
-interface TrendingRepoItem {
-	id: number;
-	name: string;
-	full_name: string;
-	description: string | null;
-	html_url: string;
-	stargazers_count: number;
-	forks_count: number;
-	language: string | null;
-	created_at: string | null;
-	owner: { login: string; avatar_url: string };
 }
 
 function extractRepoName(repoUrl: string) {
 	const parts = repoUrl.split("/");
 	return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
 }
-
-const langColor: Record<string, string> = {
-	TypeScript: "#3178c6",
-	JavaScript: "#f1e05a",
-	Python: "#3572A5",
-	Rust: "#dea584",
-	Go: "#00ADD8",
-	Java: "#b07219",
-	Ruby: "#701516",
-	Swift: "#F05138",
-	Kotlin: "#A97BFF",
-	"C++": "#f34b7d",
-	"C#": "#178600",
-	PHP: "#4F5D95",
-	Vue: "#41b883",
-	Svelte: "#ff3e00",
-	HTML: "#e34c26",
-	CSS: "#563d7c",
-	Shell: "#89e051",
-};
 
 export function DashboardContent({
 	user,
@@ -161,7 +60,6 @@ export function DashboardContent({
 	myIssues,
 	repos,
 	notifications,
-	contributions,
 	activity,
 	trending,
 }: DashboardContentProps) {
@@ -232,7 +130,6 @@ export function DashboardContent({
 						/>
 					</div>
 
-	
 					{/* Tabbed work panel */}
 					<WorkTabs
 						reviewRequests={reviewRequests}
@@ -254,8 +151,6 @@ export function DashboardContent({
 		</div>
 	);
 }
-
-/* ── ExtensionBanner ──────────────────────────────────────────────── */
 
 const EXTENSION_DISMISSED_KEY = "extension-banner-dismissed";
 
@@ -297,9 +192,6 @@ function ExtensionBanner() {
 		</div>
 	);
 }
-
-/* ── WorkTabs ─────────────────────────────────────────────────────── */
-
 type TabKey = "reviews" | "prs" | "issues";
 
 function WorkTabs({
@@ -308,9 +200,9 @@ function WorkTabs({
 	myIssues,
 	hasWork,
 }: {
-	reviewRequests: { items: Array<IssueItem>; total_count: number };
-	myOpenPRs: { items: Array<IssueItem>; total_count: number };
-	myIssues: { items: Array<IssueItem>; total_count: number };
+	reviewRequests: SearchResult<IssueItem>;
+	myOpenPRs: SearchResult<IssueItem>;
+	myIssues: SearchResult<IssueItem>;
 	hasWork: boolean;
 }) {
 	const [activeTab, setActiveTab] = useState<TabKey>("reviews");
@@ -404,8 +296,6 @@ function EmptyTab({ message }: { message: string }) {
 		</div>
 	);
 }
-
-/* ── ReposTabs ─────────────────────────────────────────────────────── */
 
 function ReposTabs({
 	repos,
@@ -504,7 +394,13 @@ function Stat({
 			<div className="pointer-events-none absolute -inset-1/2 w-[200%] h-[200%] rotate-12 bg-gradient-to-br from-transparent via-white/[0.5] dark:via-white/[0.03] to-transparent translate-x-[-30%] translate-y-[-10%]" />
 			<div className="relative flex flex-col gap-1.5">
 				<div className="flex items-center gap-1.5">
-					<span className={cn(accent ? "text-foreground/60" : "text-muted-foreground/40")}>
+					<span
+						className={cn(
+							accent
+								? "text-foreground/60"
+								: "text-muted-foreground/40",
+						)}
+					>
 						{icon}
 					</span>
 					<span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/60">
@@ -515,7 +411,9 @@ function Stat({
 					<span
 						className={cn(
 							"text-lg font-medium tabular-nums tracking-tight",
-							accent ? "text-foreground" : "text-foreground/60",
+							accent
+								? "text-foreground"
+								: "text-foreground/60",
 						)}
 					>
 						{value}
@@ -557,8 +455,6 @@ function Panel({
 	);
 }
 
-/* ── ItemRow (PR / Issue) ──────────────────────────────────────────── */
-
 function ItemRow({ item, type }: { item: IssueItem; type: "pr" | "issue" }) {
 	const repo = extractRepoName(item.repository_url);
 	const isMerged = type === "pr" && item.pull_request?.merged_at;
@@ -567,7 +463,7 @@ function ItemRow({ item, type }: { item: IssueItem; type: "pr" | "issue" }) {
 	return (
 		<Link
 			href={toInternalUrl(item.html_url)}
-			className="group flex items-center gap-3 px-4 py-2 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-border/60 last:border-b-0"
+			className="group flex items-center gap-3 px-4 py-2 hover:bg-muted/50 dark:hover:bg-white/2 transition-colors border-b border-border/60 last:border-b-0"
 		>
 			{type === "pr" ? (
 				<GitPullRequest
@@ -659,10 +555,9 @@ function RepoRow({ repo }: { repo: RepoItem }) {
 								className="w-2 h-2 rounded-full shrink-0"
 								style={{
 									backgroundColor:
-										langColor[
-											repo
-												.language
-										] || "#8b949e",
+										getLanguageColor(
+											repo.language,
+										),
 								}}
 							/>
 							{repo.language}
@@ -694,8 +589,8 @@ function TrendingRow({ repo }: { repo: TrendingRepoItem }) {
 			className="group flex gap-3 px-4 py-2.5 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors border-b border-border/60 last:border-b-0"
 		>
 			<Image
-				src={repo.owner.avatar_url}
-				alt={repo.owner.login}
+				src={repo.owner?.avatar_url ?? ""}
+				alt={repo.owner?.login ?? ""}
 				width={20}
 				height={20}
 				className="rounded-sm shrink-0 mt-0.5 w-5 h-5 object-cover"
@@ -704,7 +599,7 @@ function TrendingRow({ repo }: { repo: TrendingRepoItem }) {
 				<div className="flex items-center gap-2">
 					<span className="text-xs font-mono truncate group-hover:text-foreground transition-colors">
 						<span className="text-muted-foreground/50">
-							{repo.owner.login}
+							{repo.owner?.login}
 						</span>
 						<span className="text-muted-foreground/30 mx-0.5">
 							/
@@ -724,10 +619,9 @@ function TrendingRow({ repo }: { repo: TrendingRepoItem }) {
 								className="w-2 h-2 rounded-full shrink-0"
 								style={{
 									backgroundColor:
-										langColor[
-											repo
-												.language
-										] || "#8b949e",
+										getLanguageColor(
+											repo.language,
+										),
 								}}
 							/>
 							{repo.language}

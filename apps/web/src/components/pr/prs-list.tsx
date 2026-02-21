@@ -12,24 +12,24 @@ import {
 	GitBranch,
 	FileCode2,
 	X,
+	Loader2,
 } from "lucide-react";
-import type { CheckStatus } from "@/lib/github";
+import type { CheckStatus, PRPageResult } from "@/lib/github";
 import { CheckStatusBadge } from "@/components/pr/check-status-badge";
 import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { useClickOutside } from "@/hooks/use-click-outside";
-import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import {
 	ListSearchInput,
 	SortCycleButton,
 	FiltersButton,
 	ClearFiltersButton,
-	InfiniteScrollSentinel,
 	LoadingOverlay,
 } from "@/components/shared/list-controls";
 import { LabelBadge } from "@/components/shared/label-badge";
 import { useMutationSubscription } from "@/hooks/use-mutation-subscription";
 import { isRepoEvent, type MutationEvent } from "@/lib/mutation-events";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 interface PRUser {
 	login: string;
@@ -59,6 +59,88 @@ interface PR {
 	checkStatus?: CheckStatus;
 }
 
+const checkStatusCache = new Map<string, { data: Record<number, CheckStatus>; ts: number }>();
+const CHECK_STATUS_TTL = 5 * 60 * 1000;
+
+function useBatchCheckStatuses(
+	owner: string,
+	repo: string,
+	openPRs: PR[],
+	onFetchAllCheckStatuses?: (
+		owner: string,
+		repo: string,
+		prNumbers: number[],
+	) => Promise<Record<number, CheckStatus>>,
+) {
+	const cacheKey = `${owner}/${repo}`;
+	const cached = checkStatusCache.get(cacheKey);
+	const hasFreshCache = cached && Date.now() - cached.ts < CHECK_STATUS_TTL;
+
+	const [statusMap, setStatusMap] = useState<Record<number, CheckStatus>>(
+		hasFreshCache ? cached.data : {},
+	);
+	const [loaded, setLoaded] = useState(!!hasFreshCache);
+	const fetchedRef = useRef(false);
+
+	useEffect(() => {
+		if (fetchedRef.current || !onFetchAllCheckStatuses || openPRs.length === 0) return;
+
+		const existing = checkStatusCache.get(cacheKey);
+		if (existing && Date.now() - existing.ts < CHECK_STATUS_TTL) {
+			setStatusMap(existing.data);
+			setLoaded(true);
+			fetchedRef.current = true;
+			return;
+		}
+
+		fetchedRef.current = true;
+		const prNumbers = openPRs.map((pr) => pr.number);
+		onFetchAllCheckStatuses(owner, repo, prNumbers).then(
+			(result) => {
+				checkStatusCache.set(cacheKey, { data: result, ts: Date.now() });
+				setStatusMap(result);
+				setLoaded(true);
+			},
+			() => setLoaded(true),
+		);
+	}, [owner, repo, cacheKey, openPRs, onFetchAllCheckStatuses]);
+
+	return { statusMap, loaded };
+}
+
+function PRCheckStatus({
+	pr,
+	owner,
+	repo,
+	resolvedStatus,
+	loaded,
+}: {
+	pr: PR;
+	owner: string;
+	repo: string;
+	resolvedStatus: CheckStatus | undefined;
+	loaded: boolean;
+}) {
+	if (pr.checkStatus) {
+		return <CheckStatusBadge checkStatus={pr.checkStatus} owner={owner} repo={repo} />;
+	}
+
+	if (!loaded && pr.state === "open") {
+		return (
+			<span className="flex items-center gap-1 animate-pulse">
+				<span className="w-3 h-3 rounded-full bg-muted-foreground/15" />
+				<span className="w-6 h-2.5 rounded-sm bg-muted-foreground/10" />
+			</span>
+		);
+	}
+
+	if (resolvedStatus) {
+		return <CheckStatusBadge checkStatus={resolvedStatus} owner={owner} repo={repo} />;
+	}
+
+	return null;
+}
+
 type SortType = "updated" | "newest" | "oldest" | "comments";
 type DraftFilter = "all" | "ready" | "draft";
 type ReviewFilter = "all" | "has_reviewers" | "no_reviewers";
@@ -73,26 +155,49 @@ const sortLabels: Record<SortType, string> = {
 
 const sortCycle: SortType[] = ["updated", "newest", "oldest", "comments"];
 
+type FetchPRPageFn = (
+	owner: string,
+	repo: string,
+	state: "open" | "closed" | "all",
+	cursor: string | null,
+) => Promise<{ prs: PRPageResult["prs"]; pageInfo: PRPageResult["pageInfo"] }>;
+
 export function PRsList({
 	owner,
 	repo,
-	openPRs,
-	closedPRs,
+	initialOpenPRs,
+	initialPageInfo,
+	mergedPreview: initialMergedPreview,
+	closedPreview: initialClosedPreview,
 	openCount,
 	closedCount,
+	mergedCount,
 	onAuthorFilter,
+	onFetchAllCheckStatuses,
+	onPrefetchPRDetail,
+	onFetchPRPage,
 }: {
 	owner: string;
 	repo: string;
-	openPRs: PR[];
-	closedPRs: PR[];
+	initialOpenPRs: PR[];
+	initialPageInfo: PRPageResult["pageInfo"];
+	mergedPreview?: PR[];
+	closedPreview?: PR[];
 	openCount: number;
 	closedCount: number;
+	mergedCount: number;
 	onAuthorFilter?: (
 		owner: string,
 		repo: string,
 		author: string,
 	) => Promise<{ open: PR[]; closed: PR[] }>;
+	onFetchAllCheckStatuses?: (
+		owner: string,
+		repo: string,
+		prNumbers: number[],
+	) => Promise<Record<number, CheckStatus>>;
+	onPrefetchPRDetail?: (owner: string, repo: string, pullNumber: number, authorLogin?: string | null) => Promise<void>;
+	onFetchPRPage?: FetchPRPageFn;
 }) {
 	type TabState = "open" | "merged" | "closed";
 	const [state, setState] = useState<TabState>("open");
@@ -115,9 +220,76 @@ export function PRsList({
 	const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
 	const [countAdjustments, setCountAdjustments] = useState({ open: 0, merged: 0, closed: 0 });
 
+	type PRPage = { prs: PR[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
+
+	const openQuery = useInfiniteQuery<PRPage, Error, { pages: PRPage[]; pageParams: (string | null)[] }, string[], string | null>({
+		queryKey: ["prs", owner, repo, "open"],
+		queryFn: async ({ pageParam }) => {
+			if (!onFetchPRPage) return { prs: [], pageInfo: { hasNextPage: false, endCursor: null } };
+			return onFetchPRPage(owner, repo, "open", pageParam) as Promise<PRPage>;
+		},
+		initialPageParam: null,
+		initialData: {
+			pages: [{ prs: initialOpenPRs, pageInfo: initialPageInfo }],
+			pageParams: [null],
+		},
+		getNextPageParam: (lastPage) => lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : undefined,
+		enabled: false,
+	});
+
+	const closedQuery = useInfiniteQuery<PRPage, Error, { pages: PRPage[]; pageParams: (string | null)[] }, string[], string | null>({
+		queryKey: ["prs", owner, repo, "closed"],
+		queryFn: async ({ pageParam }) => {
+			if (!onFetchPRPage) return { prs: [], pageInfo: { hasNextPage: false, endCursor: null } };
+			return onFetchPRPage(owner, repo, "closed", pageParam) as Promise<PRPage>;
+		},
+		initialPageParam: null,
+		getNextPageParam: (lastPage) => lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : undefined,
+		enabled: false,
+	});
+
+	const openPRs = useMemo(
+		() => openQuery.data?.pages.flatMap((p) => p.prs) ?? initialOpenPRs,
+		[openQuery.data, initialOpenPRs],
+	);
+
+	const closedAllPRs = useMemo(
+		() => closedQuery.data?.pages.flatMap((p) => p.prs) ?? [],
+		[closedQuery.data],
+	);
+
+	const closedPRsLoaded = closedQuery.data !== undefined;
+
+	const handleTabChange = useCallback(
+		(tab: TabState) => {
+			setState(tab);
+			if (tab !== "open" && !closedQuery.data && !closedQuery.isFetching) {
+				closedQuery.refetch();
+			}
+		},
+		[closedQuery],
+	);
+
+	const { statusMap, loaded: checkStatusesLoaded } = useBatchCheckStatuses(
+		owner,
+		repo,
+		openPRs,
+		onFetchAllCheckStatuses,
+	);
+
+	const prefetchedRef = useRef(new Set<number>());
+	const handlePRHover = useCallback(
+		(prNumber: number, authorLogin?: string | null) => {
+			if (!onPrefetchPRDetail || prefetchedRef.current.has(prNumber)) return;
+			prefetchedRef.current.add(prNumber);
+			onPrefetchPRDetail(owner, repo, prNumber, authorLogin);
+		},
+		[owner, repo, onPrefetchPRDetail],
+	);
+
 	useEffect(() => {
 		setCountAdjustments({ open: 0, merged: 0, closed: 0 });
-	}, [openPRs, closedPRs]);
+	}, [openPRs, closedAllPRs]);
 
 	useMutationSubscription(
 		["pr:merged", "pr:closed", "pr:reopened"],
@@ -138,7 +310,7 @@ export function PRsList({
 		},
 	);
 
-	const allPRs = useMemo(() => [...openPRs, ...closedPRs], [openPRs, closedPRs]);
+	const allPRs = useMemo(() => [...openPRs, ...closedAllPRs], [openPRs, closedAllPRs]);
 
 	const authors = useMemo(() => {
 		const seen = new Map<string, PRUser>();
@@ -161,7 +333,6 @@ export function PRsList({
 		[authors, selectedAuthor],
 	);
 
-	// Close dropdown on outside click
 	useClickOutside(
 		authorRef,
 		useCallback(() => setAuthorDropdownOpen(false), []),
@@ -211,15 +382,25 @@ export function PRsList({
 	};
 
 	const currentOpenPRs = authorPRs ? authorPRs.open : openPRs;
-	const currentClosedPRs = authorPRs ? authorPRs.closed : closedPRs;
+	const currentClosedPRs = authorPRs ? authorPRs.closed : closedAllPRs;
 
 	const mergedPRs = useMemo(
-		() => currentClosedPRs.filter((pr) => !!pr.merged_at),
-		[currentClosedPRs],
+		() =>
+			authorPRs
+				? currentClosedPRs.filter((pr) => !!pr.merged_at)
+				: closedPRsLoaded
+					? currentClosedPRs.filter((pr) => !!pr.merged_at)
+					: (initialMergedPreview ?? []),
+		[authorPRs, currentClosedPRs, closedPRsLoaded, initialMergedPreview],
 	);
 	const closedUnmergedPRs = useMemo(
-		() => currentClosedPRs.filter((pr) => !pr.merged_at),
-		[currentClosedPRs],
+		() =>
+			authorPRs
+				? currentClosedPRs.filter((pr) => !pr.merged_at)
+				: closedPRsLoaded
+					? currentClosedPRs.filter((pr) => !pr.merged_at)
+					: (initialClosedPreview ?? []),
+		[authorPRs, currentClosedPRs, closedPRsLoaded, initialClosedPreview],
 	);
 
 	const basePRs =
@@ -237,102 +418,57 @@ export function PRsList({
 					const matchesSearch =
 						pr.title.toLowerCase().includes(q) ||
 						pr.user?.login.toLowerCase().includes(q) ||
-						(pr.head?.ref?.toLowerCase().includes(q) ??
-							false) ||
-						(pr.base?.ref?.toLowerCase().includes(q) ??
-							false) ||
-						pr.labels.some((l) =>
-							l.name?.toLowerCase().includes(q),
-						);
+						(pr.head?.ref?.toLowerCase().includes(q) ?? false) ||
+						(pr.base?.ref?.toLowerCase().includes(q) ?? false) ||
+						pr.labels.some((l) => l.name?.toLowerCase().includes(q));
 					if (!matchesSearch) return false;
 				}
-				// Skip client-side author filter when we have server-fetched author PRs
-				if (
-					!authorPRs &&
-					selectedAuthor &&
-					pr.user?.login !== selectedAuthor
-				)
-					return false;
-				if (
-					selectedLabel &&
-					!pr.labels.some((l) => l.name === selectedLabel)
-				)
-					return false;
+				if (!authorPRs && selectedAuthor && pr.user?.login !== selectedAuthor) return false;
+				if (selectedLabel && !pr.labels.some((l) => l.name === selectedLabel)) return false;
 				if (draftFilter === "ready" && pr.draft) return false;
 				if (draftFilter === "draft" && !pr.draft) return false;
-				if (
-					reviewFilter === "has_reviewers" &&
-					(pr.requested_reviewers?.length ?? 0) === 0
-				)
-					return false;
-				if (
-					reviewFilter === "no_reviewers" &&
-					(pr.requested_reviewers?.length ?? 0) > 0
-				)
-					return false;
-				if (
-					assigneeFilter === "assigned" &&
-					(pr.assignees?.length ?? 0) === 0
-				)
-					return false;
-				if (
-					assigneeFilter === "unassigned" &&
-					(pr.assignees?.length ?? 0) > 0
-				)
-					return false;
+				if (reviewFilter === "has_reviewers" && (pr.requested_reviewers?.length ?? 0) === 0) return false;
+				if (reviewFilter === "no_reviewers" && (pr.requested_reviewers?.length ?? 0) > 0) return false;
+				if (assigneeFilter === "assigned" && (pr.assignees?.length ?? 0) === 0) return false;
+				if (assigneeFilter === "unassigned" && (pr.assignees?.length ?? 0) > 0) return false;
 				if (selectedBranch && pr.base?.ref !== selectedBranch) return false;
 				return true;
 			})
 			.sort((a, b) => {
 				switch (sort) {
 					case "newest":
-						return (
-							new Date(b.created_at).getTime() -
-							new Date(a.created_at).getTime()
-						);
+						return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 					case "oldest":
-						return (
-							new Date(a.created_at).getTime() -
-							new Date(b.created_at).getTime()
-						);
+						return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
 					case "comments":
-						return (
-							(b.comments ?? 0) +
-							(b.review_comments ?? 0) -
-							((a.comments ?? 0) +
-								(a.review_comments ?? 0))
-						);
+						return (b.comments ?? 0) + (b.review_comments ?? 0) - ((a.comments ?? 0) + (a.review_comments ?? 0));
 					default:
-						return (
-							new Date(b.updated_at).getTime() -
-							new Date(a.updated_at).getTime()
-						);
+						return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
 				}
 			});
 	}, [
-		basePRs,
-		search,
-		sort,
-		selectedAuthor,
-		selectedLabel,
-		draftFilter,
-		reviewFilter,
-		assigneeFilter,
-		selectedBranch,
-		authorPRs,
+		basePRs, search, sort, selectedAuthor, selectedLabel,
+		draftFilter, reviewFilter, assigneeFilter, selectedBranch, authorPRs,
 	]);
 
-	const { visible, hasMore, loadMore, sentinelRef } = useInfiniteScroll(filtered, [
-		state,
-		search,
-		sort,
-		selectedAuthor,
-		selectedLabel,
-		draftFilter,
-		reviewFilter,
-		assigneeFilter,
-		selectedBranch,
-	]);
+	const activeQuery = state === "open" ? openQuery : closedQuery;
+	const canFetchMore = activeQuery.hasNextPage && !activeQuery.isFetchingNextPage;
+
+	const sentinelRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const sentinel = sentinelRef.current;
+		if (!sentinel) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting && canFetchMore) {
+					activeQuery.fetchNextPage();
+				}
+			},
+			{ rootMargin: "200px" },
+		);
+		observer.observe(sentinel);
+		return () => observer.disconnect();
+	}, [canFetchMore, activeQuery]);
 
 	return (
 		<div>
@@ -724,13 +860,17 @@ export function PRsList({
 							icon: (
 								<GitPullRequest className="w-3 h-3" />
 							),
-							count: currentOpenPRs.length + countAdjustments.open,
+							count: authorPRs
+								? currentOpenPRs.length
+								: openCount + countAdjustments.open,
 						},
 						{
 							key: "merged" as TabState,
 							label: "Merged",
 							icon: <GitMerge className="w-3 h-3" />,
-							count: mergedPRs.length + countAdjustments.merged,
+							count: authorPRs
+								? mergedPRs.length
+								: mergedCount + countAdjustments.merged,
 						},
 						{
 							key: "closed" as TabState,
@@ -738,12 +878,14 @@ export function PRsList({
 							icon: (
 								<GitPullRequestClosed className="w-3 h-3" />
 							),
-							count: closedUnmergedPRs.length + countAdjustments.closed,
+							count: authorPRs
+								? closedUnmergedPRs.length
+								: closedCount + countAdjustments.closed,
 						},
 					].map((tab) => (
 						<button
 							key={tab.key}
-							onClick={() => setState(tab.key)}
+							onClick={() => handleTabChange(tab.key)}
 							className={cn(
 								"relative flex items-center gap-1.5 px-3 pb-2.5 pt-1 text-[12px] transition-colors cursor-pointer",
 								state === tab.key
@@ -776,7 +918,7 @@ export function PRsList({
 			{/* PR List */}
 			<div className="relative flex-1 min-h-0 overflow-y-auto divide-y divide-border">
 				<LoadingOverlay show={isPending} />
-				{visible.map((pr) => {
+				{filtered.map((pr) => {
 					const isMerged = !!pr.merged_at;
 					const totalComments =
 						(pr.comments ?? 0) + (pr.review_comments ?? 0);
@@ -785,6 +927,7 @@ export function PRsList({
 						<Link
 							key={pr.id}
 							href={`/${owner}/${repo}/pulls/${pr.number}`}
+							onMouseEnter={() => handlePRHover(pr.number, pr.user?.login)}
 							className="group flex items-start gap-3 px-4 py-3 hover:bg-muted/50 dark:hover:bg-white/[0.02] transition-colors"
 						>
 							{isMerged ? (
@@ -921,17 +1064,13 @@ export function PRsList({
 								</div>
 
 								<div className="flex items-center gap-2 sm:gap-3 mt-1 flex-wrap">
-									{pr.checkStatus && (
-										<CheckStatusBadge
-											checkStatus={
-												pr.checkStatus
-											}
-											owner={
-												owner
-											}
-											repo={repo}
-										/>
-									)}
+									<PRCheckStatus
+										pr={pr}
+										owner={owner}
+										repo={repo}
+										resolvedStatus={statusMap[pr.number]}
+										loaded={checkStatusesLoaded}
+									/>
 									<span className="text-[11px] font-mono text-muted-foreground/70">
 										#{pr.number}
 									</span>
@@ -1012,14 +1151,21 @@ export function PRsList({
 					);
 				})}
 
-				<InfiniteScrollSentinel
-					sentinelRef={sentinelRef}
-					hasMore={hasMore}
-					loadMore={loadMore}
-					remaining={filtered.length - visible.length}
-				/>
+				{activeQuery.isFetching && (
+					<div className={cn(
+						"text-center",
+						filtered.length > 0 ? "py-6 border-t border-border/30" : "py-16",
+					)}>
+						<Loader2 className="w-4 h-4 text-muted-foreground/40 mx-auto mb-2 animate-spin" />
+						<p className="text-xs text-muted-foreground/50 font-mono">
+							Loading more pull requests…
+						</p>
+					</div>
+				)}
 
-				{filtered.length === 0 && (
+				<div ref={sentinelRef} className="h-1" />
+
+				{!activeQuery.isFetching && filtered.length === 0 && (
 					<div className="py-16 text-center">
 						<GitPullRequest className="w-6 h-6 text-muted-foreground/30 mx-auto mb-3" />
 						<p className="text-xs text-muted-foreground font-mono">

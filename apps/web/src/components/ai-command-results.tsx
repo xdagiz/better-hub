@@ -13,23 +13,9 @@ import {
 import type { ComponentProps } from "react";
 import ReactMarkdown from "react-markdown";
 import { cn, formatNumber } from "@/lib/utils";
+import { getLanguageColor } from "@/lib/github-utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { useSession } from "@/lib/auth-client";
-
-const languageColors: Record<string, string> = {
-	TypeScript: "#3178c6",
-	JavaScript: "#f1e05a",
-	Python: "#3572A5",
-	Rust: "#dea584",
-	Go: "#00ADD8",
-	Java: "#b07219",
-	Ruby: "#701516",
-	Swift: "#F05138",
-	Kotlin: "#A97BFF",
-	"C++": "#f34b7d",
-	"C#": "#178600",
-	PHP: "#4F5D95",
-};
 
 // ─── Tool Loading Indicator ────────────────────────────────────────────────────
 
@@ -138,11 +124,9 @@ export function RepoSearchResults({
 										className="size-1.5 rounded-full"
 										style={{
 											backgroundColor:
-												languageColors[
-													repo
-														.language
-												] ||
-												"#8b949e",
+												getLanguageColor(
+													repo.language,
+												),
 										}}
 									/>
 									{repo.language}
@@ -646,10 +630,9 @@ export function RepoInfoCard({
 								className="size-1.5 rounded-full"
 								style={{
 									backgroundColor:
-										languageColors[
-											output
-												.language
-										] || "#8b949e",
+										getLanguageColor(
+											output.language,
+										),
 								}}
 							/>
 							{output.language}

@@ -7,12 +7,13 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── Better Auth tables ─────────────────────────────────────────────────────
 
 model User {
   id            String    @id
   name          String
   email         String
+  githubPat     String?
+  onboardingDone Boolean @default(false)
   emailVerified Boolean
   image         String?
   createdAt     DateTime
@@ -22,6 +23,7 @@ model User {
   accounts Account[]
 
   @@map("user")
+  @@index([githubPat, email])
 }
 
 model Session {
@@ -37,6 +39,7 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
+  @@index([userId, expiresAt])
 }
 
 model Account {
@@ -57,6 +60,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("account")
+  @@index([userId, providerId])
 }
 
 model Verification {
@@ -68,9 +72,9 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verification")
+  @@index([identifier, expiresAt])
 }
 
-// ─── GitHub cache & sync ────────────────────────────────────────────────────
 
 model GithubCacheEntry {
   userId    String
@@ -104,8 +108,6 @@ model GithubSyncJob {
   @@map("github_sync_jobs")
 }
 
-// ─── Chat ───────────────────────────────────────────────────────────────────
-
 model ChatConversation {
   id         String @id
   userId     String
@@ -135,8 +137,6 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
-// ─── Ghost tabs ─────────────────────────────────────────────────────────────
-
 model GhostTab {
   userId   String
   tabId    String
@@ -154,8 +154,6 @@ model GhostTabState {
 
   @@map("ghost_tab_state")
 }
-
-// ─── User settings ──────────────────────────────────────────────────────────
 
 model UserSettings {
   userId          String  @id
@@ -176,8 +174,6 @@ model UserSettings {
   @@map("user_settings")
 }
 
-// ─── Custom code themes ─────────────────────────────────────────────────────
-
 model CustomCodeTheme {
   id          String @id
   userId      String
@@ -191,23 +187,6 @@ model CustomCodeTheme {
 
   @@map("custom_code_themes")
 }
-
-// ─── GitHub accounts ────────────────────────────────────────────────────────
-
-model GitHubAccount {
-  id        String  @id
-  userId    String
-  login     String
-  avatarUrl String
-  label     String
-  pat       String
-  active    Boolean @default(false)
-  createdAt String
-
-  @@map("github_accounts")
-}
-
-// ─── Prompt requests ────────────────────────────────────────────────────────
 
 model PromptRequest {
   id             String  @id
@@ -230,7 +209,6 @@ model PromptRequest {
   @@map("prompt_requests")
 }
 
-// ─── Search embeddings ──────────────────────────────────────────────────────
 
 model SearchEmbedding {
   id           String  @id
@@ -253,7 +231,6 @@ model SearchEmbedding {
   @@map("search_embeddings")
 }
 
-// ─── Pinned items ──────────────────────────────────────────────────────────
 
 model PinnedItem {
   id       String @id

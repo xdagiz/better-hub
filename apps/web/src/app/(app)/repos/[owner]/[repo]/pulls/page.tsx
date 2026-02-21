@@ -1,11 +1,6 @@
-import {
-	getRepoPullRequests,
-	searchIssues,
-	enrichPRsWithStats,
-	enrichPRsWithCheckStatus,
-} from "@/lib/github";
+import { getRepoPullRequestsWithStats } from "@/lib/github";
 import { PRsList } from "@/components/pr/prs-list";
-import { fetchPRsByAuthor } from "./actions";
+import { fetchPRsByAuthor, fetchAllCheckStatuses, prefetchPRDetail, fetchPRPage } from "./actions";
 
 export default async function PullsListPage({
 	params,
@@ -14,47 +9,36 @@ export default async function PullsListPage({
 }) {
 	const { owner, repo } = await params;
 
-	const [openPRs, closedPRs, openCount, closedCount] = await Promise.all([
-		getRepoPullRequests(owner, repo, "open"),
-		getRepoPullRequests(owner, repo, "closed"),
-		searchIssues(`is:pr is:open repo:${owner}/${repo}`, 1),
-		searchIssues(`is:pr is:closed repo:${owner}/${repo}`, 1),
-	]);
-
-	const allPRs = [...openPRs, ...closedPRs];
-	const [statsMap, checkStatusMap] = await Promise.all([
-		enrichPRsWithStats(owner, repo, allPRs),
-		enrichPRsWithCheckStatus(owner, repo, openPRs),
-	]);
-
-	const enrich = (prs: typeof openPRs) =>
-		prs.map((pr) => {
-			const stats = statsMap.get(pr.number);
-			const checkStatus = checkStatusMap.get(pr.number);
-			return { ...pr, ...(stats ?? {}), ...(checkStatus ? { checkStatus } : {}) };
+	const { prs: openPRs, pageInfo, counts, mergedPreview, closedPreview } =
+		await getRepoPullRequestsWithStats(owner, repo, "open", {
+			includeCounts: true,
+			previewClosed: 10,
+			perPage: 20,
 		});
 
 	return (
 		<PRsList
 			owner={owner}
 			repo={repo}
-			openPRs={
-				enrich(openPRs) as unknown as Parameters<
-					typeof PRsList
-				>[0]["openPRs"]
-			}
-			closedPRs={
-				enrich(closedPRs) as unknown as Parameters<
-					typeof PRsList
-				>[0]["closedPRs"]
-			}
-			openCount={openCount.total_count}
-			closedCount={closedCount.total_count}
+			initialOpenPRs={openPRs as unknown as Parameters<typeof PRsList>[0]["initialOpenPRs"]}
+			initialPageInfo={pageInfo}
+			mergedPreview={mergedPreview as unknown as Parameters<typeof PRsList>[0]["mergedPreview"]}
+			closedPreview={closedPreview as unknown as Parameters<typeof PRsList>[0]["closedPreview"]}
+			openCount={counts.open}
+			closedCount={counts.closed}
+			mergedCount={counts.merged}
 			onAuthorFilter={
 				fetchPRsByAuthor as unknown as Parameters<
 					typeof PRsList
 				>[0]["onAuthorFilter"]
 			}
+			onFetchAllCheckStatuses={
+				fetchAllCheckStatuses as unknown as Parameters<
+					typeof PRsList
+				>[0]["onFetchAllCheckStatuses"]
+			}
+			onPrefetchPRDetail={prefetchPRDetail}
+			onFetchPRPage={fetchPRPage}
 		/>
 	);
 }

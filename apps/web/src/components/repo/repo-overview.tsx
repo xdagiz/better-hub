@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { useQuery } from "@tanstack/react-query";
 import { cn, formatNumber } from "@/lib/utils";
-import type { CommitActivityWeek, CheckStatus, CheckRun } from "@/lib/github";
+import type { CommitActivityWeek, CheckStatus } from "@/lib/github";
 import { GitPullRequest, CircleDot, MessageSquare, XCircle, Pin, GitCommit, Link2, X } from "lucide-react";
 import { CheckStatusBadge } from "@/components/pr/check-status-badge";
 import { unpinFromOverview } from "@/app/(app)/repos/[owner]/[repo]/pin-actions";
@@ -13,36 +14,15 @@ import type { PinnedItem } from "@/lib/pinned-items-store";
 import { useMutationSubscription } from "@/hooks/use-mutation-subscription";
 import { useMutationEvents } from "@/components/shared/mutation-event-provider";
 import { isRepoEvent, type MutationEvent } from "@/lib/mutation-events";
-
-// --- Language colors (shared with InsightsView) ---
-const LANG_COLORS: Record<string, string> = {
-	JavaScript: "#f1e05a",
-	TypeScript: "#3178c6",
-	Python: "#3572A5",
-	Java: "#b07219",
-	Go: "#00ADD8",
-	Rust: "#dea584",
-	Ruby: "#701516",
-	PHP: "#4F5D95",
-	"C++": "#f34b7d",
-	C: "#555555",
-	"C#": "#178600",
-	Swift: "#F05138",
-	Kotlin: "#A97BFF",
-	Dart: "#00B4AB",
-	Shell: "#89e051",
-	HTML: "#e34c26",
-	CSS: "#563d7c",
-	SCSS: "#c6538c",
-	Vue: "#41b883",
-	Svelte: "#ff3e00",
-};
-
-function formatBytes(bytes: number): string {
-	if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
-	if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(1)} KB`;
-	return `${bytes} B`;
-}
+import { useReadme } from "@/hooks/use-readme";
+import { MarkdownCopyHandler } from "@/components/shared/markdown-copy-handler";
+import {
+	fetchOverviewPRs,
+	fetchOverviewIssues,
+	fetchOverviewCommitActivity,
+	fetchOverviewEvents,
+	fetchOverviewCIStatus,
+} from "@/app/(app)/repos/[owner]/[repo]/overview-actions";
 
 // --- Shared UI primitives ---
 function Section({
@@ -516,19 +496,14 @@ const ACTIVITY_COUNT = 15;
 
 function ActivityFeed({
 	repoEvents,
-	myRepoEvents,
 	commitActivity,
 	base,
 }: {
 	repoEvents: RepoEvent[];
-	myRepoEvents?: RepoEvent[];
 	commitActivity?: CommitActivityWeek[];
 	base: string;
 }) {
-	const [filter, setFilter] = useState<"all" | "mine">("all");
-	const rawEvents = filter === "mine" && myRepoEvents ? myRepoEvents : repoEvents;
-	const events = filterSignificantEvents(rawEvents);
-	const hasMyEvents = myRepoEvents && filterSignificantEvents(myRepoEvents).length > 0;
+	const events = filterSignificantEvents(repoEvents);
 	const visibleEvents = events.slice(0, ACTIVITY_COUNT);
 
 	return (
@@ -541,43 +516,9 @@ function ActivityFeed({
 					<CommitActivityGraph data={commitActivity} />
 				) : undefined
 			}
-			actions={
-				hasMyEvents ? (
-					<div className="flex items-center gap-0.5 text-[10px] font-mono">
-						<button
-							onClick={() => setFilter("all")}
-							className={cn(
-								"px-2 py-0.5 rounded-l-md transition-colors cursor-pointer",
-								filter === "all"
-									? "bg-muted/80 text-foreground"
-									: "text-muted-foreground/50 hover:text-muted-foreground",
-							)}
-						>
-							All
-						</button>
-						<button
-							onClick={() => setFilter("mine")}
-							className={cn(
-								"px-2 py-0.5 rounded-r-md transition-colors cursor-pointer",
-								filter === "mine"
-									? "bg-muted/80 text-foreground"
-									: "text-muted-foreground/50 hover:text-muted-foreground",
-							)}
-						>
-							Mine
-						</button>
-					</div>
-				) : undefined
-			}
 		>
 			{events.length === 0 ? (
-				<EmptyState
-					message={
-						filter === "mine"
-							? "No activity from you"
-							: "No recent activity"
-					}
-				/>
+				<EmptyState message="No recent activity" />
 			) : (
 				<>
 					<div className="space-y-0.5 flex-1">
@@ -596,65 +537,6 @@ function ActivityFeed({
 				</>
 			)}
 		</Section>
-	);
-}
-
-// --- Language breakdown ---
-function LanguageBreakdown({ languages }: { languages: Record<string, number> }) {
-	const entries = Object.entries(languages).sort((a, b) => b[1] - a[1]);
-	if (entries.length === 0) return <EmptyState message="No language data" />;
-
-	const totalBytes = entries.reduce((sum, [, bytes]) => sum + bytes, 0);
-	const top6 = entries.slice(0, 6);
-	const otherBytes = entries.slice(6).reduce((sum, [, bytes]) => sum + bytes, 0);
-	const display =
-		otherBytes > 0 ? [...top6, ["Other", otherBytes] as [string, number]] : top6;
-
-	return (
-		<>
-			<div className="flex h-2.5 rounded-sm overflow-hidden mb-3">
-				{display.map(([lang, bytes]) => (
-					<div
-						key={lang}
-						className="h-full"
-						style={{
-							width: `${(bytes / totalBytes) * 100}%`,
-							backgroundColor:
-								LANG_COLORS[lang] ?? "#6b7280",
-						}}
-					/>
-				))}
-			</div>
-			<div className="space-y-1">
-				{display.map(([lang, bytes]) => {
-					const pct = ((bytes / totalBytes) * 100).toFixed(1);
-					return (
-						<div
-							key={lang}
-							className="flex items-center gap-2 text-xs"
-						>
-							<span
-								className="w-2 h-2 rounded-full shrink-0"
-								style={{
-									backgroundColor:
-										LANG_COLORS[lang] ??
-										"#6b7280",
-								}}
-							/>
-							<span className="font-mono text-foreground/80">
-								{lang}
-							</span>
-							<span className="font-mono text-muted-foreground/60 ml-auto tabular-nums">
-								{pct}%
-							</span>
-							<span className="font-mono text-muted-foreground/40 tabular-nums w-14 text-right">
-								{formatBytes(bytes)}
-							</span>
-						</div>
-					);
-				})}
-			</div>
-		</>
 	);
 }
 
@@ -706,13 +588,6 @@ interface IssueItem {
 	comments: number;
 	reactions?: { total_count: number };
 	labels?: Array<{ name?: string; color?: string }>;
-}
-
-interface ContributorItem {
-	login: string;
-	avatar_url: string;
-	contributions: number;
-	html_url: string;
 }
 
 // --- Highlighted Activity Ticker ---
@@ -1011,73 +886,146 @@ function HighlightedActivityTicker({ items }: { items: HotItem[] }) {
 	);
 }
 
+function ReadmeSkeleton() {
+	return (
+		<div className="rounded-lg bg-muted/20 overflow-hidden">
+			<div className="px-6 py-5 space-y-4 animate-pulse">
+				<div className="h-7 w-2/5 bg-muted/40 rounded" />
+				<div className="space-y-2.5">
+					<div className="h-4 w-full bg-muted/30 rounded" />
+					<div className="h-4 w-11/12 bg-muted/30 rounded" />
+					<div className="h-4 w-4/5 bg-muted/30 rounded" />
+				</div>
+				<div className="space-y-2.5 pt-2">
+					<div className="h-4 w-full bg-muted/30 rounded" />
+					<div className="h-4 w-3/4 bg-muted/30 rounded" />
+				</div>
+				<div className="h-24 w-full bg-muted/20 rounded-md" />
+				<div className="space-y-2.5">
+					<div className="h-4 w-full bg-muted/30 rounded" />
+					<div className="h-4 w-5/6 bg-muted/30 rounded" />
+					<div className="h-4 w-2/3 bg-muted/30 rounded" />
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function MaintainerSkeleton() {
+	return (
+		<div className="grid grid-cols-1 gap-4 lg:flex-1 lg:min-h-0 lg:grid-rows-1 lg:grid-cols-3">
+			{[0, 1, 2].map((i) => (
+				<div key={i} className="p-4 animate-pulse">
+					<div className="flex items-baseline gap-2 mb-4">
+						<div className="h-4 w-24 bg-muted/40 rounded" />
+						<div className="h-3 w-8 bg-muted/30 rounded ml-auto" />
+					</div>
+					<div className="space-y-3">
+						{[0, 1, 2, 3, 4].map((j) => (
+							<div key={j} className="flex items-start gap-2.5 py-2">
+								<div className="w-4 h-4 rounded bg-muted/30 shrink-0 mt-0.5" />
+								<div className="flex-1 space-y-1.5">
+									<div className="h-3.5 bg-muted/30 rounded" style={{ width: `${70 - j * 8}%` }} />
+									<div className="h-2.5 w-20 bg-muted/20 rounded" />
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
 export interface RepoOverviewProps {
 	owner: string;
 	repo: string;
 	repoData: RepoData;
 	isMaintainer: boolean;
-	openPRs: PRItem[];
-	openIssues: IssueItem[];
 	openPRCount?: number;
 	openIssueCount?: number;
-	// Maintainer-only
-	commitActivity?: CommitActivityWeek[];
-	repoEvents?: RepoEvent[];
-	myRepoEvents?: RepoEvent[];
-	ciStatus?: CheckStatus | null;
-	defaultBranch?: string;
 	pinnedItems?: PinnedItem[];
-	// Non-maintainer-only
-	readmeSlot?: React.ReactNode;
-	contributors?: ContributorItem[];
-	languages?: Record<string, number>;
+	defaultBranch?: string;
+	initialReadmeHtml?: string | null;
+	initialPRs?: PRItem[] | null;
+	initialIssues?: IssueItem[] | null;
+	initialEvents?: RepoEvent[] | null;
+	initialCommitActivity?: CommitActivityWeek[] | null;
+	initialCIStatus?: CheckStatus | null;
 }
 
 export function RepoOverview({
 	owner,
 	repo,
-	repoData,
+	repoData: _repoData,
 	isMaintainer,
-	openPRs,
-	openIssues,
 	openPRCount,
 	openIssueCount,
-	commitActivity,
-	repoEvents,
-	myRepoEvents,
-	ciStatus,
 	defaultBranch,
 	pinnedItems,
-	readmeSlot,
-	contributors,
-	languages,
+	initialReadmeHtml,
+	initialPRs,
+	initialIssues,
+	initialEvents,
+	initialCommitActivity,
+	initialCIStatus,
 }: RepoOverviewProps) {
 	const base = `/${owner}/${repo}`;
+	const branch = defaultBranch ?? "main";
 
-	const infoRow =
-		repoData.description || (repoData.topics?.length ?? 0) > 0 ? (
-			<div className="rounded-lg bg-muted/20 p-4">
-				{repoData.description && (
-					<p className="text-sm text-foreground/80 mb-3">
-						{repoData.description}
-					</p>
-				)}
-				{(repoData.topics?.length ?? 0) > 0 && (
-					<div className="flex flex-wrap gap-1.5">
-						{repoData.topics!.map((topic: string) => (
-							<span
-								key={topic}
-								className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground/70"
-							>
-								{topic}
-							</span>
-						))}
-					</div>
-				)}
-			</div>
-		) : null;
+	const { data: openPRs = [] } = useQuery({
+		queryKey: ["overview-prs", owner, repo],
+		queryFn: () => fetchOverviewPRs(owner, repo),
+		initialData: initialPRs ?? undefined,
+		enabled: isMaintainer,
+		staleTime: Infinity,
+		gcTime: Infinity,
+		refetchOnMount: "always",
+	});
 
+	const { data: openIssues = [] } = useQuery({
+		queryKey: ["overview-issues", owner, repo],
+		queryFn: () => fetchOverviewIssues(owner, repo),
+		initialData: initialIssues ?? undefined,
+		enabled: isMaintainer,
+		staleTime: Infinity,
+		gcTime: Infinity,
+		refetchOnMount: "always",
+	});
+
+	const { data: commitActivity } = useQuery({
+		queryKey: ["overview-commit-activity", owner, repo],
+		queryFn: () => fetchOverviewCommitActivity(owner, repo),
+		initialData: initialCommitActivity ?? undefined,
+		enabled: isMaintainer,
+		staleTime: Infinity,
+		gcTime: Infinity,
+		refetchOnMount: "always",
+	});
+
+	const { data: repoEvents } = useQuery({
+		queryKey: ["overview-events", owner, repo],
+		queryFn: () => fetchOverviewEvents(owner, repo),
+		initialData: initialEvents ?? undefined,
+		enabled: isMaintainer,
+		staleTime: Infinity,
+		gcTime: Infinity,
+		refetchOnMount: "always",
+	});
+
+	const { data: ciStatus } = useQuery({
+		queryKey: ["overview-ci", owner, repo, branch],
+		queryFn: () => fetchOverviewCIStatus(owner, repo, branch),
+		initialData: initialCIStatus ?? undefined,
+		enabled: isMaintainer,
+		staleTime: Infinity,
+		gcTime: Infinity,
+		refetchOnMount: "always",
+	});
+
+	const hasInitialData = !!(initialPRs || initialIssues || initialEvents);
 	const hotItems = isMaintainer ? computeHotItems(openPRs, openIssues, base) : [];
+	const showSkeleton = isMaintainer && !hasInitialData && openPRs.length === 0 && openIssues.length === 0 && !repoEvents;
 
 	if (isMaintainer) {
 		return (
@@ -1088,7 +1036,7 @@ export function RepoOverview({
 							ciStatus={ciStatus}
 							owner={owner}
 							repo={repo}
-							defaultBranch={defaultBranch ?? "main"}
+							defaultBranch={branch}
 						/>
 					)}
 					{pinnedItems && pinnedItems.length > 0 && (
@@ -1103,122 +1051,74 @@ export function RepoOverview({
 					)}
 				</div>
 
-				<div
-					className={cn(
-						"grid grid-cols-1 gap-4 lg:flex-1 lg:min-h-0 lg:grid-rows-1",
-						openIssues.length > 0
-							? "lg:grid-cols-3"
-							: "lg:grid-cols-2",
-					)}
-				>
-					{/* Recent activity */}
-					<ActivityFeed
-						repoEvents={repoEvents ?? []}
-						myRepoEvents={myRepoEvents}
-						commitActivity={commitActivity}
-						base={base}
-					/>
-
-					{/* Recent open PRs */}
-					<SortableList
-						title="Open PRs"
-						totalCount={openPRCount ?? openPRs.length}
-						items={openPRs}
-						type="pr"
-						base={base}
-						viewAllHref={`${base}/pulls`}
-					/>
-
-					{/* Recent open issues */}
-					{openIssues.length > 0 && (
-						<SortableList
-							title="Open Issues"
-							totalCount={
-								openIssueCount ?? openIssues.length
-							}
-							items={openIssues}
-							type="issue"
+				{showSkeleton ? (
+					<MaintainerSkeleton />
+				) : (
+					<div
+						className={cn(
+							"grid grid-cols-1 gap-4 lg:flex-1 lg:min-h-0 lg:grid-rows-1",
+							openIssues.length > 0
+								? "lg:grid-cols-3"
+								: "lg:grid-cols-2",
+						)}
+					>
+						<ActivityFeed
+							repoEvents={repoEvents ?? []}
+							commitActivity={commitActivity}
 							base={base}
-							viewAllHref={`${base}/issues`}
 						/>
-					)}
-				</div>
+
+						<SortableList
+							title="Open PRs"
+							totalCount={openPRCount ?? openPRs.length}
+							items={openPRs}
+							type="pr"
+							base={base}
+							viewAllHref={`${base}/pulls`}
+						/>
+
+						{openIssues.length > 0 && (
+							<SortableList
+								title="Open Issues"
+								totalCount={
+									openIssueCount ?? openIssues.length
+								}
+								items={openIssues}
+								type="issue"
+								base={base}
+								viewAllHref={`${base}/issues`}
+							/>
+						)}
+					</div>
+				)}
 			</div>
 		);
 	}
 
-	// Non-maintainer view
+	const { data: readmeHtml, isLoading: readmeLoading } = useReadme(
+		owner,
+		repo,
+		branch,
+		initialReadmeHtml ?? null,
+	);
+
 	return (
 		<div className="space-y-4 pb-4">
 			{/* README */}
-			{readmeSlot && (
+			{readmeLoading ? (
+				<ReadmeSkeleton />
+			) : readmeHtml ? (
 				<div className="rounded-lg bg-muted/20 overflow-hidden">
-					<div className="px-6 py-5">{readmeSlot}</div>
+					<div className="px-6 py-5">
+						<MarkdownCopyHandler>
+							<div
+								className="ghmd"
+								dangerouslySetInnerHTML={{ __html: readmeHtml }}
+							/>
+						</MarkdownCopyHandler>
+					</div>
 				</div>
-			)}
-
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-				{/* Contributors */}
-				<Section
-					title="Top Contributors"
-					subtitle={
-						contributors ? `${contributors.length}` : undefined
-					}
-				>
-					{!contributors || contributors.length === 0 ? (
-						<EmptyState message="No contributor data" />
-					) : (
-						<div className="space-y-1.5">
-							{contributors.slice(0, 10).map((c) => (
-								<div
-									key={c.login}
-									className="flex items-center gap-2.5 py-1"
-								>
-									<Image
-										src={c.avatar_url}
-										alt={c.login}
-										width={20}
-										height={20}
-										className="rounded-full"
-									/>
-									<span className="text-xs font-mono text-foreground/80 truncate flex-1">
-										{c.login}
-									</span>
-									<span className="text-[10px] font-mono tabular-nums text-muted-foreground/60">
-										{formatNumber(
-											c.contributions,
-										)}{" "}
-										commits
-									</span>
-								</div>
-							))}
-						</div>
-					)}
-				</Section>
-
-				{/* Languages */}
-				<Section
-					title="Languages"
-					subtitle={
-						languages
-							? formatBytes(
-									Object.values(
-										languages,
-									).reduce(
-										(s, v) => s + v,
-										0,
-									),
-								)
-							: undefined
-					}
-				>
-					{!languages || Object.keys(languages).length === 0 ? (
-						<EmptyState message="No language data" />
-					) : (
-						<LanguageBreakdown languages={languages} />
-					)}
-				</Section>
-			</div>
+			) : null}
 		</div>
 	);
 }

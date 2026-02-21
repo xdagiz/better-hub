@@ -1,3 +1,55 @@
+export const LANGUAGE_COLORS: Record<string, string> = {
+	TypeScript: "#3178c6",
+	JavaScript: "#f1e05a",
+	Python: "#3572A5",
+	Rust: "#dea584",
+	Go: "#00ADD8",
+	Java: "#b07219",
+	Ruby: "#701516",
+	Swift: "#F05138",
+	Kotlin: "#A97BFF",
+	"C++": "#f34b7d",
+	C: "#555555",
+	"C#": "#178600",
+	PHP: "#4F5D95",
+	Vue: "#41b883",
+	Svelte: "#ff3e00",
+	HTML: "#e34c26",
+	CSS: "#563d7c",
+	SCSS: "#c6538c",
+	Shell: "#89e051",
+	Dart: "#00b4ab",
+	Scala: "#c22d40",
+	Elixir: "#6e4a7e",
+	Erlang: "#b83998",
+	Haskell: "#5e5086",
+	Lua: "#000080",
+	R: "#198ce7",
+	Perl: "#0298c3",
+	Julia: "#a270ba",
+	Clojure: "#db5855",
+	"Objective-C": "#438eff",
+	Zig: "#ec915c",
+	Nim: "#ffc200",
+	OCaml: "#3be133",
+	Nix: "#7e7eff",
+	Dockerfile: "#384d54",
+	Makefile: "#427819",
+	HCL: "#844fba",
+	Terraform: "#5c4ee5",
+	YAML: "#cb171e",
+	Markdown: "#083fa1",
+	Jupyter: "#DA5B0B",
+	Astro: "#ff5a03",
+};
+
+const DEFAULT_LANG_COLOR = "#8b949e";
+
+export function getLanguageColor(language: string | null | undefined): string {
+	if (!language) return DEFAULT_LANG_COLOR;
+	return LANGUAGE_COLORS[language] ?? DEFAULT_LANG_COLOR;
+}
+
 /**
  * Deduplicates an array of user-like objects into unique participants by login.
  */

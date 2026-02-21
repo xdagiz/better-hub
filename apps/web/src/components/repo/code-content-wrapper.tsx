@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { PanelLeft } from "lucide-react";
 import { type FileTreeNode } from "@/lib/file-tree";
 import { parseRefAndPath } from "@/lib/github-utils";
@@ -9,14 +10,18 @@ import { FileExplorerTree } from "./file-explorer-tree";
 import { BranchSelector } from "./branch-selector";
 import { BreadcrumbNav } from "./breadcrumb-nav";
 import { cn } from "@/lib/utils";
+import {
+	revalidateBranches,
+	revalidateTags,
+} from "@/app/(app)/repos/[owner]/[repo]/readme-actions";
 
 interface CodeContentWrapperProps {
 	owner: string;
 	repo: string;
 	defaultBranch: string;
 	tree: FileTreeNode[] | null;
-	branches: { name: string }[];
-	tags: { name: string }[];
+	initialBranches?: { name: string }[] | null;
+	initialTags?: { name: string }[] | null;
 	children: React.ReactNode;
 }
 
@@ -28,8 +33,8 @@ export function CodeContentWrapper({
 	repo,
 	defaultBranch,
 	tree,
-	branches,
-	tags,
+	initialBranches,
+	initialTags,
 	children,
 }: CodeContentWrapperProps) {
 	const pathname = usePathname();
@@ -39,6 +44,26 @@ export function CodeContentWrapper({
 		pathname === `${base}/code` ||
 		pathname.startsWith(`${base}/tree`) ||
 		pathname.startsWith(`${base}/blob`);
+
+	const { data: branches = [] } = useQuery({
+		queryKey: ["repo-branches", owner, repo],
+		queryFn: async () => (await revalidateBranches(owner, repo)) ?? [],
+		initialData: initialBranches ?? undefined,
+		staleTime: Infinity,
+		gcTime: Infinity,
+		refetchOnMount: "always",
+		enabled: isCodeRoute,
+	});
+
+	const { data: tags = [] } = useQuery({
+		queryKey: ["repo-tags", owner, repo],
+		queryFn: async () => (await revalidateTags(owner, repo)) ?? [],
+		initialData: initialTags ?? undefined,
+		staleTime: Infinity,
+		gcTime: Infinity,
+		refetchOnMount: "always",
+		enabled: isCodeRoute,
+	});
 
 	// Detail routes (e.g. /pulls/123, /issues/5, /people/username) manage their own scrolling
 	// Note: /pull/ (singular) comes from GitHub-style URLs rewritten by next.config.ts

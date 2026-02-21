@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { MarkdownRenderer } from "@/components/shared/markdown-renderer";
+import { MarkdownCopyHandler } from "@/components/shared/markdown-copy-handler";
 import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { BotActivityGroup } from "@/components/pr/bot-activity-group";
@@ -19,6 +19,7 @@ export interface IssueDescriptionEntry {
 	id: string;
 	user: BaseUser | null;
 	body: string;
+	bodyHtml?: string;
 	created_at: string;
 	reactions?: Reactions;
 }
@@ -28,6 +29,7 @@ export interface IssueCommentEntry {
 	id: number;
 	user: BaseUser | null;
 	body: string;
+	bodyHtml?: string;
 	created_at: string;
 	author_association?: string;
 	reactions?: Reactions;
@@ -139,7 +141,7 @@ function groupEntries(entries: IssueTimelineEntry[]): GroupedItem[] {
 	return groups;
 }
 
-export async function IssueConversation({
+export function IssueConversation({
 	entries,
 	owner,
 	repo,
@@ -307,7 +309,7 @@ function AuthorGroup({ author, children }: { author: BaseUser; children: React.R
 	);
 }
 
-async function ChatMessage({
+function ChatMessage({
 	entry,
 	isFirst,
 	owner,
@@ -325,8 +327,16 @@ async function ChatMessage({
 	const hasBody = entry.body && entry.body.trim().length > 0;
 	const isLong = hasBody && entry.body.length > 800;
 
+	const renderedBody = entry.bodyHtml ? (
+		<MarkdownCopyHandler>
+			<div
+				className="ghmd ghmd-sm"
+				dangerouslySetInnerHTML={{ __html: entry.bodyHtml }}
+			/>
+		</MarkdownCopyHandler>
+	) : null;
+
 	if (compact) {
-		// Inside an author-group: no card border, just content + timestamp
 		return (
 			<div className="px-3 py-2">
 				<div className="flex items-center gap-2 mb-1">
@@ -341,21 +351,11 @@ async function ChatMessage({
 							</span>
 						)}
 				</div>
-				{hasBody ? (
+				{hasBody && renderedBody ? (
 					isLong ? (
-						<CollapsibleBody>
-							<MarkdownRenderer
-								content={entry.body}
-								className="ghmd-sm"
-								issueRefContext={{ owner, repo }}
-							/>
-						</CollapsibleBody>
+						<CollapsibleBody>{renderedBody}</CollapsibleBody>
 					) : (
-						<MarkdownRenderer
-							content={entry.body}
-							className="ghmd-sm"
-							issueRefContext={{ owner, repo }}
-						/>
+						renderedBody
 					)
 				) : (
 					<p className="text-xs text-muted-foreground/30 italic">
@@ -440,34 +440,23 @@ async function ChatMessage({
 					</span>
 				</div>
 
-				{hasBody ? (
-					<div className="px-3 py-2.5">
-						{isLong ? (
-							<CollapsibleBody>
-								<MarkdownRenderer
-									content={entry.body}
-									className="ghmd-sm"
-									issueRefContext={{
-										owner,
-										repo,
-									}}
-								/>
-							</CollapsibleBody>
-						) : (
-							<MarkdownRenderer
-								content={entry.body}
-								className="ghmd-sm"
-								issueRefContext={{ owner, repo }}
-							/>
-						)}
-					</div>
-				) : (
-					<div className="px-3 py-3">
-						<p className="text-xs text-muted-foreground/30 italic">
-							No description provided.
-						</p>
-					</div>
-				)}
+			{hasBody && renderedBody ? (
+				<div className="px-3 py-2.5">
+					{isLong ? (
+						<CollapsibleBody>
+							{renderedBody}
+						</CollapsibleBody>
+					) : (
+						renderedBody
+					)}
+				</div>
+			) : (
+				<div className="px-3 py-3">
+					<p className="text-xs text-muted-foreground/30 italic">
+						No description provided.
+					</p>
+				</div>
+			)}
 
 				{entry.reactions && (
 					<div className="px-3 pb-2">

@@ -1,7 +1,7 @@
 import { Octokit } from "@octokit/rest";
 import { headers } from "next/headers";
 import { cache } from "react";
-import { auth } from "./auth";
+import { $Session, auth, getServerSession } from "./auth";
 import {
 	claimDueGithubSyncJobs,
 	deleteGithubCacheByPrefix,
@@ -12,6 +12,8 @@ import {
 	touchGithubCacheEntrySyncedAt,
 	upsertGithubCacheEntry,
 } from "./github-sync-store";
+import { redis } from "./redis";
+import { all } from "better-all";
 
 export type RepoPermissions = {
 	admin: boolean;
@@ -43,6 +45,7 @@ interface GitHubAuthContext {
 	token: string;
 	octokit: Octokit;
 	forceRefresh: boolean;
+	githubUser: $Session["githubUser"];
 }
 
 type GitDataSyncJobType =
@@ -138,7 +141,7 @@ const CACHE_TTL_MS = {
 	trendingRepos: 600_000,
 	repoIssues: 60_000,
 	repoPullRequests: 60_000,
-	issue: 60_000,
+	issue: 300_000,
 	issueComments: 60_000,
 	pullRequest: 60_000,
 	pullRequestFiles: 120_000,
@@ -152,6 +155,7 @@ const CACHE_TTL_MS = {
 	repoWorkflows: 300_000,
 	repoWorkflowRuns: 60_000,
 	repoNavCounts: 60_000,
+	repoLanguages: 300_000,
 	orgMembers: 300_000,
 	personRepoActivity: 120_000,
 	prBundle: 60_000,
@@ -181,14 +185,6 @@ export class GitHubRateLimitError extends Error {
 		this.limit = limit;
 		this.used = used;
 	}
-}
-
-function isOctokitNotModified(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		(error as { status?: number }).status === 304
-	);
 }
 
 function isOctokitNotFound(error: unknown): boolean {
@@ -402,6 +398,10 @@ function buildRepoNavCountsCacheKey(owner: string, repo: string): string {
 	return `repo_nav_counts:${normalizeRepoKey(owner, repo)}`;
 }
 
+function buildRepoLanguagesCacheKey(owner: string, repo: string): string {
+	return `repo_languages:${normalizeRepoKey(owner, repo)}`;
+}
+
 function buildOrgMembersCacheKey(org: string, perPage: number): string {
 	return `org_members:${org.toLowerCase()}:${perPage}`;
 }
@@ -414,28 +414,27 @@ function buildPRBundleCacheKey(owner: string, repo: string, pullNumber: number):
 	return `pr_bundle:${normalizeRepoKey(owner, repo)}:${pullNumber}`;
 }
 
-const getGitHubAuthContext = cache(async (): Promise<GitHubAuthContext | null> => {
-	const reqHeaders = await headers();
-	const session = await auth.api.getSession({
-		headers: reqHeaders,
+const DEFAULT_BRANCH_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+
+function defaultBranchRedisKey(owner: string, repo: string): string {
+	return `repo_default_branch:${normalizeRepoKey(owner, repo)}`;
+}
+
+export async function getCachedDefaultBranch(owner: string, repo: string): Promise<string | null> {
+	return redis.get<string>(defaultBranchRedisKey(owner, repo));
+}
+
+async function cacheDefaultBranch(owner: string, repo: string, branch: string): Promise<void> {
+	await redis.set(defaultBranchRedisKey(owner, repo), branch, {
+		ex: DEFAULT_BRANCH_TTL_SECONDS,
 	});
+}
+
+const getGitHubAuthContext = cache(async (): Promise<GitHubAuthContext | null> => {
+	const session = await getServerSession();
+	const reqHeaders = await headers();
 	if (!session) return null;
-
-	const ctx = await auth.$context;
-	const accounts = await ctx.internalAdapter.findAccounts(session.user.id);
-	const githubAccount = accounts.find(
-		(account: { providerId: string }) => account.providerId === "github",
-	);
-
-	const oauthToken = githubAccount?.accessToken;
-	if (!oauthToken) return null;
-
-	const { getActiveGitHubAccount } = await import("./github-accounts-store");
-	const activeAccount = await getActiveGitHubAccount(session.user.id);
-
-	const { getUserSettings } = await import("./user-settings-store");
-	const settings = await getUserSettings(session.user.id);
-	const token = activeAccount?.pat || settings.githubPat || oauthToken;
+	const token = session.githubUser.accessToken;
 
 	const cacheControl = reqHeaders.get("cache-control") ?? "";
 	const pragma = reqHeaders.get("pragma") ?? "";
@@ -449,6 +448,7 @@ const getGitHubAuthContext = cache(async (): Promise<GitHubAuthContext | null> =
 		token,
 		octokit: new Octokit({ auth: token }),
 		forceRefresh,
+		githubUser: session.githubUser,
 	};
 });
 
@@ -580,11 +580,6 @@ async function fetchRepoReadmeFromGitHub(
 	} catch {
 		return null;
 	}
-}
-
-async function fetchAuthenticatedUserFromGitHub(octokit: Octokit) {
-	const { data } = await octokit.users.getAuthenticated();
-	return data;
 }
 
 async function fetchUserOrgsFromGitHub(octokit: Octokit, perPage: number) {
@@ -1035,7 +1030,11 @@ async function processGitDataSyncJob(
 		case "authenticated_user": {
 			const auKey = buildAuthenticatedUserCacheKey();
 			const auCached = await getGithubCacheEntry(authCtx.userId, auKey);
-			const auResp = await ghConditionalGet(authCtx.token, "/user", auCached?.etag ?? null);
+			const auResp = await ghConditionalGet(
+				authCtx.token,
+				"/user",
+				auCached?.etag ?? null,
+			);
 			if (auResp.notModified) {
 				await touchGithubCacheEntrySyncedAt(authCtx.userId, auKey);
 			} else {
@@ -1196,7 +1195,11 @@ async function processGitDataSyncJob(
 			if (!payload.username) return;
 			const upKey = buildUserProfileCacheKey(payload.username);
 			const upCached = await getGithubCacheEntry(authCtx.userId, upKey);
-			const upResp = await ghConditionalGet(authCtx.token, `/users/${payload.username}`, upCached?.etag ?? null);
+			const upResp = await ghConditionalGet(
+				authCtx.token,
+				`/users/${payload.username}`,
+				upCached?.etag ?? null,
+			);
 			if (upResp.notModified) {
 				await touchGithubCacheEntrySyncedAt(authCtx.userId, upKey);
 			} else {
@@ -1737,16 +1740,7 @@ export async function getOctokit(): Promise<Octokit | null> {
 
 export async function getAuthenticatedUser() {
 	const authCtx = await getGitHubAuthContext();
-	return readLocalFirstGitData({
-		authCtx,
-		cacheKey: buildAuthenticatedUserCacheKey(),
-		cacheType: "authenticated_user",
-		ttlMs: CACHE_TTL_MS.authenticatedUser,
-		fallback: null,
-		jobType: "authenticated_user",
-		jobPayload: {},
-		fetchRemote: (octokit) => fetchAuthenticatedUserFromGitHub(octokit),
-	});
+	return authCtx?.githubUser ?? null;
 }
 
 export async function getUserRepos(sort: RepoSort = "updated", perPage = 30) {
@@ -2869,41 +2863,269 @@ export async function getRepoPullRequests(
 }
 
 export async function enrichPRsWithStats(owner: string, repo: string, prs: { number: number }[]) {
-	const octokit = await getOctokit();
-	if (!octokit)
+	if (prs.length === 0)
 		return new Map<
 			number,
 			{ additions: number; deletions: number; changed_files: number }
 		>();
 
-	const results = await Promise.all(
-		prs.map((pr) =>
-			octokit.pulls.get({ owner, repo, pull_number: pr.number }).then(
-				(r) => ({
-					number: pr.number,
-					additions: r.data.additions,
-					deletions: r.data.deletions,
-					changed_files: r.data.changed_files,
-				}),
-				() => null,
-			),
-		),
+	const token = await getGitHubToken();
+	if (!token)
+		return new Map<
+			number,
+			{ additions: number; deletions: number; changed_files: number }
+		>();
+
+	const prFragments = prs.map(
+		(pr, i) =>
+			`pr${i}: pullRequest(number: ${pr.number}) { number additions deletions changedFiles }`,
 	);
 
-	const map = new Map<
-		number,
-		{ additions: number; deletions: number; changed_files: number }
-	>();
-	for (const result of results) {
-		if (result) {
-			map.set(result.number, {
-				additions: result.additions,
-				deletions: result.deletions,
-				changed_files: result.changed_files,
-			});
+	const query = `query { repository(owner: "${owner}", name: "${repo}") { ${prFragments.join(" ")} } }`;
+
+	try {
+		const response = await fetch("https://api.github.com/graphql", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${token}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ query }),
+		});
+
+		if (!response.ok)
+			return new Map<
+				number,
+				{ additions: number; deletions: number; changed_files: number }
+			>();
+
+		const json = await response.json();
+		const repoData = json.data?.repository;
+		if (!repoData)
+			return new Map<
+				number,
+				{ additions: number; deletions: number; changed_files: number }
+			>();
+
+		const map = new Map<
+			number,
+			{ additions: number; deletions: number; changed_files: number }
+		>();
+		for (let i = 0; i < prs.length; i++) {
+			const pr = repoData[`pr${i}`];
+			if (pr) {
+				map.set(pr.number, {
+					additions: pr.additions,
+					deletions: pr.deletions,
+					changed_files: pr.changedFiles,
+				});
+			}
 		}
+		return map;
+	} catch {
+		return new Map<
+			number,
+			{ additions: number; deletions: number; changed_files: number }
+		>();
 	}
-	return map;
+}
+
+const PR_LIST_GRAPHQL_STATES = {
+	open: "OPEN",
+	closed: "CLOSED",
+	merged: "MERGED",
+} as const;
+
+const PR_NODE_FRAGMENT = `
+	id: databaseId
+	number
+	title
+	state
+	isDraft
+	updatedAt
+	createdAt
+	comments { totalCount }
+	reviewThreads { totalCount }
+	author { login avatarUrl }
+	labels(first: 10) { nodes { name color } }
+	mergedAt
+	headRefName
+	headRefOid
+	baseRefName
+	reviewRequests(first: 10) {
+		nodes { requestedReviewer { ... on User { login avatarUrl } } }
+	}
+	assignees(first: 10) { nodes { login avatarUrl } }
+	additions
+	deletions
+	changedFiles
+`;
+
+function mapGraphQLPRNode(pr: Record<string, unknown>) {
+	const author = pr.author as { login: string; avatarUrl: string } | null;
+	const labels = (
+		(pr.labels as { nodes: { name: string; color: string }[] })?.nodes ?? []
+	).map((l) => ({ name: l.name, color: l.color?.replace("#", "") }));
+	const reviewRequests = (
+		(
+			pr.reviewRequests as {
+				nodes: {
+					requestedReviewer: { login: string; avatarUrl: string } | null;
+				}[];
+			}
+		)?.nodes ?? []
+	)
+		.filter((r) => r.requestedReviewer)
+		.map((r) => ({
+			login: r.requestedReviewer!.login,
+			avatar_url: r.requestedReviewer!.avatarUrl,
+		}));
+	const assignees = (
+		(pr.assignees as { nodes: { login: string; avatarUrl: string }[] })?.nodes ?? []
+	).map((a) => ({ login: a.login, avatar_url: a.avatarUrl }));
+
+	const gqlState = pr.state as string;
+
+	return {
+		id: pr.id as number,
+		number: pr.number as number,
+		title: pr.title as string,
+		state: gqlState === "MERGED" ? "closed" : gqlState.toLowerCase(),
+		draft: pr.isDraft as boolean,
+		updated_at: pr.updatedAt as string,
+		created_at: pr.createdAt as string,
+		comments: (pr.comments as { totalCount: number })?.totalCount ?? 0,
+		review_comments: (pr.reviewThreads as { totalCount: number })?.totalCount ?? 0,
+		user: author ? { login: author.login, avatar_url: author.avatarUrl } : null,
+		labels,
+		merged_at: (pr.mergedAt as string) ?? null,
+		head: { ref: pr.headRefName as string, sha: pr.headRefOid as string },
+		base: { ref: pr.baseRefName as string },
+		requested_reviewers: reviewRequests,
+		assignees,
+		additions: pr.additions as number,
+		deletions: pr.deletions as number,
+		changed_files: pr.changedFiles as number,
+	};
+}
+
+const EMPTY_COUNTS = { open: 0, merged: 0, closed: 0 };
+
+export interface PRPageResult {
+	prs: ReturnType<typeof mapGraphQLPRNode>[];
+	pageInfo: { hasNextPage: boolean; endCursor: string | null };
+	counts: { open: number; merged: number; closed: number };
+	mergedPreview: ReturnType<typeof mapGraphQLPRNode>[];
+	closedPreview: ReturnType<typeof mapGraphQLPRNode>[];
+}
+
+const EMPTY_PAGE_RESULT: PRPageResult = {
+	prs: [],
+	pageInfo: { hasNextPage: false, endCursor: null },
+	counts: EMPTY_COUNTS,
+	mergedPreview: [],
+	closedPreview: [],
+};
+
+export async function getRepoPullRequestsWithStats(
+	owner: string,
+	repo: string,
+	state: "open" | "closed" | "all" = "open",
+	opts?: { includeCounts?: boolean; previewClosed?: number; perPage?: number; cursor?: string | null },
+): Promise<PRPageResult> {
+	const token = await getGitHubToken();
+	if (!token) return EMPTY_PAGE_RESULT;
+
+	const states =
+		state === "all"
+			? ["OPEN", "CLOSED", "MERGED"]
+			: state === "closed"
+				? ["CLOSED", "MERGED"]
+				: [PR_LIST_GRAPHQL_STATES[state] ?? "OPEN"];
+	const statesArg = `[${states.join(", ")}]`;
+	const limit = opts?.perPage ?? 20;
+
+	const previewCount = opts?.previewClosed ?? 0;
+	const wantCounts = !!opts?.includeCounts;
+
+	const countFields = wantCounts
+		? `
+			openCount: pullRequests(states: [OPEN]) { totalCount }
+			mergedCount: pullRequests(states: [MERGED]) { totalCount }
+			closedCount: pullRequests(states: [CLOSED]) { totalCount }
+		`
+		: "";
+
+	const previewFields =
+		previewCount > 0
+			? `
+			mergedPreview: pullRequests(first: ${previewCount}, states: [MERGED], orderBy: { field: UPDATED_AT, direction: DESC }) {
+				nodes { ${PR_NODE_FRAGMENT} }
+			}
+			closedPreview: pullRequests(first: ${previewCount}, states: [CLOSED], orderBy: { field: UPDATED_AT, direction: DESC }) {
+				nodes { ${PR_NODE_FRAGMENT} }
+			}
+		`
+			: "";
+
+	const afterArg = opts?.cursor ? `, after: "${opts.cursor}"` : "";
+
+	const query = `query($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {
+			${countFields}
+			${previewFields}
+			pullRequests(first: ${limit}, states: ${statesArg}, orderBy: { field: UPDATED_AT, direction: DESC }${afterArg}) {
+				pageInfo { hasNextPage endCursor }
+				nodes { ${PR_NODE_FRAGMENT} }
+			}
+		}
+	}`;
+
+	try {
+		const response = await fetch("https://api.github.com/graphql", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${token}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ query, variables: { owner, name: repo } }),
+		});
+
+		if (!response.ok) return EMPTY_PAGE_RESULT;
+		const json = await response.json();
+		const repo_data = json.data?.repository;
+		const prConnection = repo_data?.pullRequests;
+		const nodes = prConnection?.nodes;
+		if (!nodes) return EMPTY_PAGE_RESULT;
+
+		const counts = wantCounts
+			? {
+					open: repo_data.openCount?.totalCount ?? 0,
+					merged: repo_data.mergedCount?.totalCount ?? 0,
+					closed: repo_data.closedCount?.totalCount ?? 0,
+				}
+			: EMPTY_COUNTS;
+
+		const pageInfo = {
+			hasNextPage: prConnection.pageInfo?.hasNextPage ?? false,
+			endCursor: prConnection.pageInfo?.endCursor ?? null,
+		};
+
+		const prs = (nodes as Record<string, unknown>[]).map(mapGraphQLPRNode);
+
+		const mergedPreview =
+			previewCount > 0
+				? ((repo_data.mergedPreview?.nodes ?? []) as Record<string, unknown>[]).map(mapGraphQLPRNode)
+				: [];
+		const closedPreview =
+			previewCount > 0
+				? ((repo_data.closedPreview?.nodes ?? []) as Record<string, unknown>[]).map(mapGraphQLPRNode)
+				: [];
+
+		return { prs, pageInfo, counts, mergedPreview, closedPreview };
+	} catch {
+		return EMPTY_PAGE_RESULT;
+	}
 }
 
 export interface CheckRun {
@@ -3035,6 +3257,203 @@ export async function enrichPRsWithCheckStatus(
 }
 
 export { fetchCheckStatusForRef };
+
+const CHECK_STATUS_REDIS_TTL = 300; // 5 minutes
+
+function checkStatusRedisKey(owner: string, repo: string) {
+	return `check_statuses:${owner.toLowerCase()}/${repo.toLowerCase()}`;
+}
+
+export async function batchFetchCheckStatuses(
+	owner: string,
+	repo: string,
+	prs: { number: number }[],
+): Promise<Record<number, CheckStatus>> {
+	if (prs.length === 0) return {};
+
+	const rKey = checkStatusRedisKey(owner, repo);
+	try {
+		const cached = await redis.get<Record<number, CheckStatus>>(rKey);
+		if (cached && typeof cached === "object") {
+			if (prs.every((p) => p.number in cached)) return cached;
+		}
+	} catch {
+		// Redis miss — continue to fetch
+	}
+
+	const token = await getGitHubToken();
+	if (!token) return {};
+
+	const fragments = prs.map(
+		(pr, i) => `pr${i}: pullRequest(number: ${pr.number}) {
+			number
+			commits(last: 1) {
+				nodes {
+					commit {
+						statusCheckRollup {
+							state
+							contexts(first: 100) {
+								nodes {
+									__typename
+									... on CheckRun {
+										name
+										status
+										conclusion
+										detailsUrl
+										databaseId
+									}
+									... on StatusContext {
+										context
+										state
+										targetUrl
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}`,
+	);
+
+	const query = `query($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) { ${fragments.join("\n")} }
+	}`;
+
+	try {
+		const response = await fetch("https://api.github.com/graphql", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${token}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ query, variables: { owner, name: repo } }),
+		});
+
+		if (!response.ok) return {};
+		const json = await response.json();
+		const repoData = json.data?.repository;
+		if (!repoData) return {};
+
+		const result: Record<number, CheckStatus> = {};
+		for (let i = 0; i < prs.length; i++) {
+			const prData = repoData[`pr${i}`];
+			if (!prData) continue;
+			const commit = prData.commits?.nodes?.[0]?.commit;
+			const rollup = commit?.statusCheckRollup;
+			if (!rollup) continue;
+
+			const contexts = rollup.contexts?.nodes ?? [];
+			const checks: CheckRun[] = [];
+
+			for (const ctx of contexts) {
+				if (ctx.__typename === "CheckRun") {
+					const runIdMatch =
+						ctx.detailsUrl?.match(/\/actions\/runs\/(\d+)/);
+					checks.push({
+						name: ctx.name,
+						state: normalizeCheckConclusion(
+							ctx.status?.toLowerCase() ?? "",
+							ctx.conclusion?.toLowerCase() ?? null,
+						),
+						url: ctx.detailsUrl || null,
+						runId: runIdMatch
+							? Number(runIdMatch[1])
+							: ctx.databaseId
+								? null
+								: null,
+					});
+				} else if (ctx.__typename === "StatusContext") {
+					const stateStr = (ctx.state ?? "").toUpperCase();
+					checks.push({
+						name: ctx.context,
+						state:
+							stateStr === "SUCCESS"
+								? "success"
+								: stateStr === "PENDING" ||
+									  stateStr === "EXPECTED"
+									? "pending"
+									: "failure",
+						url: ctx.targetUrl || null,
+						runId: null,
+					});
+				}
+			}
+
+			if (checks.length === 0) continue;
+
+			const success = checks.filter(
+				(c) =>
+					c.state === "success" ||
+					c.state === "neutral" ||
+					c.state === "skipped",
+			).length;
+			const failure = checks.filter(
+				(c) => c.state === "failure" || c.state === "error",
+			).length;
+			const pending = checks.filter((c) => c.state === "pending").length;
+			const state: CheckStatus["state"] =
+				failure > 0 ? "failure" : pending > 0 ? "pending" : "success";
+
+			result[prData.number] = {
+				state,
+				total: checks.length,
+				success,
+				failure,
+				pending,
+				checks,
+			};
+		}
+
+		if (Object.keys(result).length > 0) {
+			redis.set(rKey, result, { ex: CHECK_STATUS_REDIS_TTL }).catch(() => {});
+		}
+
+		return result;
+	} catch {
+		return {};
+	}
+}
+
+export async function getCachedCheckStatus(
+	owner: string,
+	repo: string,
+	prNumber: number,
+): Promise<CheckStatus | null> {
+	try {
+		const cached = await redis.get<Record<number, CheckStatus>>(
+			checkStatusRedisKey(owner, repo),
+		);
+		if (cached && typeof cached === "object" && prNumber in cached) {
+			return cached[prNumber];
+		}
+	} catch {
+		// Cache miss
+	}
+	return null;
+}
+
+export async function prefetchPRData(owner: string, repo: string, opts?: { prefetchIssues?: boolean }) {
+	try {
+		const rKey = checkStatusRedisKey(owner, repo);
+		const cached = await redis.get(rKey);
+		const prPrefetch = cached
+			? Promise.resolve()
+			: getRepoPullRequestsWithStats(owner, repo, "open").then(({ prs }) =>
+					prs.length > 0
+						? batchFetchCheckStatuses(owner, repo, prs.map((pr) => ({ number: pr.number }))).then(() => {})
+						: undefined,
+				);
+
+		const issuesPrefetch = opts?.prefetchIssues
+			? getRepoIssues(owner, repo, "open").then(() => {})
+			: Promise.resolve();
+
+		await Promise.all([prPrefetch, issuesPrefetch]);
+	} catch {
+		// Background prefetch — swallow errors
+	}
+}
 
 export type SecurityFeatureStatus = "enabled" | "disabled" | "not_set" | "unknown";
 
@@ -3777,6 +4196,272 @@ export async function getLanguages(owner: string, repo: string): Promise<Record<
 	} catch {
 		return {};
 	}
+}
+
+// --- Combined repo page data via single GraphQL call ---
+
+export interface RepoPageData {
+	repoData: {
+		description?: string;
+		topics: string[];
+		stargazers_count: number;
+		forks_count: number;
+		subscribers_count: number;
+		watchers_count: number;
+		default_branch: string;
+		owner: { avatar_url: string; login: string; type: string };
+		permissions: RepoPermissions;
+		private: boolean;
+		archived: boolean;
+		fork: boolean;
+		language: string | null;
+		license: { name: string; spdx_id: string | null } | null;
+		pushed_at: string;
+		size: number;
+		html_url: string;
+		homepage: string | null;
+		parent: { full_name: string; owner: { login: string }; name: string } | null;
+		open_issues_count: number;
+	};
+	navCounts: { openPrs: number; openIssues: number; activeRuns: number };
+	languages: Record<string, number>;
+	viewerHasStarred: boolean;
+	viewerIsOrgMember: boolean;
+	latestCommit: {
+		sha: string;
+		message: string;
+		date: string;
+		author: { login: string; avatarUrl: string } | null;
+	} | null;
+}
+
+function mapViewerPermission(perm: string | null): RepoPermissions {
+	const level = perm ?? "READ";
+	return {
+		admin: level === "ADMIN",
+		maintain: level === "ADMIN" || level === "MAINTAIN",
+		push: level === "ADMIN" || level === "MAINTAIN" || level === "WRITE",
+		triage:
+			level === "ADMIN" ||
+			level === "MAINTAIN" ||
+			level === "WRITE" ||
+			level === "TRIAGE",
+		pull: true,
+	};
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+async function fetchRepoPageDataGraphQL(
+	token: string,
+	owner: string,
+	repo: string,
+): Promise<RepoPageData | null> {
+	const query = `
+		query($owner: String!, $repo: String!) {
+			organization(login: $owner) {
+				viewerIsAMember
+			}
+			repository(owner: $owner, name: $repo) {
+				description
+				stargazerCount
+				forkCount
+				watchers { totalCount }
+				isInOrganization
+				isPrivate
+				isArchived
+				isFork
+				owner { login avatarUrl }
+				defaultBranchRef {
+					name
+					target {
+						... on Commit {
+							history(first: 1) {
+								nodes {
+									oid
+									message
+									committedDate
+									author {
+										user { login avatarUrl }
+										name
+									}
+								}
+							}
+						}
+					}
+				}
+				viewerPermission
+				viewerHasStarred
+				primaryLanguage { name }
+				licenseInfo { name spdxId }
+				pushedAt
+				diskUsage
+				url
+				homepageUrl
+				repositoryTopics(first: 20) {
+					nodes { topic { name } }
+				}
+				pullRequests(states: [OPEN]) { totalCount }
+				issues(states: [OPEN]) { totalCount }
+				languages(first: 20, orderBy: { field: SIZE, direction: DESC }) {
+					edges { size node { name } }
+				}
+				parent { nameWithOwner owner { login } name }
+			}
+		}
+	`;
+
+	const response = await fetch("https://api.github.com/graphql", {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ query, variables: { owner, repo } }),
+	});
+
+	if (!response.ok) throw new Error(`GraphQL request failed: ${response.status}`);
+	const json = await response.json();
+	const r = json.data?.repository;
+	if (!r) return null;
+
+	const viewerIsOrgMember: boolean =
+		json.data?.organization?.viewerIsAMember ?? false;
+
+	const languages: Record<string, number> = {};
+	for (const edge of r.languages?.edges ?? []) {
+		languages[edge.node.name] = edge.size;
+	}
+
+	const latestNode = r.defaultBranchRef?.target?.history?.nodes?.[0];
+	const latestCommit = latestNode
+		? {
+				sha: latestNode.oid,
+				message: latestNode.message?.split("\n")[0] ?? "",
+				date: latestNode.committedDate ?? "",
+				author: latestNode.author?.user
+					? {
+							login: latestNode.author.user.login,
+							avatarUrl: latestNode.author.user.avatarUrl,
+						}
+					: latestNode.author?.name
+						? { login: latestNode.author.name, avatarUrl: "" }
+						: null,
+			}
+		: null;
+
+	const parentNode = r.parent;
+
+	return {
+		repoData: {
+			description: r.description ?? undefined,
+			topics: (r.repositoryTopics?.nodes ?? []).map((n: any) => n.topic.name),
+			stargazers_count: r.stargazerCount ?? 0,
+			forks_count: r.forkCount ?? 0,
+			subscribers_count: r.watchers?.totalCount ?? 0,
+			watchers_count: r.stargazerCount ?? 0,
+			default_branch: r.defaultBranchRef?.name ?? "main",
+			owner: {
+				avatar_url: r.owner?.avatarUrl ?? "",
+				login: r.owner?.login ?? owner,
+				type: r.isInOrganization ? "Organization" : "User",
+			},
+			permissions: mapViewerPermission(r.viewerPermission),
+			private: r.isPrivate ?? false,
+			archived: r.isArchived ?? false,
+			fork: r.isFork ?? false,
+			language: r.primaryLanguage?.name ?? null,
+			license: r.licenseInfo
+				? {
+						name: r.licenseInfo.name,
+						spdx_id: r.licenseInfo.spdxId ?? null,
+					}
+				: null,
+			pushed_at: r.pushedAt ?? "",
+			size: r.diskUsage ?? 0,
+			html_url: r.url ?? `https://github.com/${owner}/${repo}`,
+			homepage: r.homepageUrl || null,
+			parent: parentNode
+				? {
+						full_name: parentNode.nameWithOwner,
+						owner: { login: parentNode.owner.login },
+						name: parentNode.name,
+					}
+				: null,
+			open_issues_count: r.issues?.totalCount ?? 0,
+		},
+		navCounts: {
+			openPrs: r.pullRequests?.totalCount ?? 0,
+			openIssues: r.issues?.totalCount ?? 0,
+			activeRuns: 0,
+		},
+		languages,
+		viewerHasStarred: r.viewerHasStarred ?? false,
+		viewerIsOrgMember,
+		latestCommit,
+	};
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+export const getRepoPageData = cache(
+	async (owner: string, repo: string): Promise<RepoPageData | null> => {
+		const { getCachedRepoPageData } = await import("@/lib/repo-data-cache");
+		const cached = await getCachedRepoPageData<RepoPageData>(owner, repo);
+		if (cached) return cached;
+
+		return fetchAndCacheRepoPageData(owner, repo);
+	},
+);
+
+export async function fetchAndCacheRepoPageData(
+	owner: string,
+	repo: string,
+): Promise<RepoPageData | null> {
+	const authCtx = await getGitHubAuthContext();
+	if (!authCtx) return null;
+
+	try {
+		const result = await fetchRepoPageDataGraphQL(authCtx.token, owner, repo);
+		if (!result) return null;
+
+		const { setCachedRepoPageData } = await import("@/lib/repo-data-cache");
+		const navCountsKey = buildRepoNavCountsCacheKey(owner, repo);
+		const languagesKey = buildRepoLanguagesCacheKey(owner, repo);
+		await Promise.all([
+			setCachedRepoPageData(owner, repo, result),
+			upsertGithubCacheEntry(
+				authCtx.userId,
+				navCountsKey,
+				"repo_nav_counts",
+				result.navCounts,
+			),
+			upsertGithubCacheEntry(
+				authCtx.userId,
+				languagesKey,
+				"repo_languages",
+				result.languages,
+			),
+			cacheDefaultBranch(owner, repo, result.repoData.default_branch),
+		]);
+
+		return result;
+	} catch {
+		return null;
+	}
+}
+
+export async function getRepoOverviewData(
+	owner: string,
+	repo: string,
+): Promise<{
+	navCounts: RepoPageData["navCounts"];
+	languages: Record<string, number>;
+}> {
+	const result = await getRepoPageData(owner, repo);
+	if (result) return { navCounts: result.navCounts, languages: result.languages };
+	return {
+		navCounts: { openPrs: 0, openIssues: 0, activeRuns: 0 },
+		languages: {},
+	};
 }
 
 export async function getRepoEvents(owner: string, repo: string, perPage = 30) {

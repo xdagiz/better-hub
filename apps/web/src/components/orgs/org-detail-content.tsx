@@ -17,6 +17,7 @@ import {
 	Users,
 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
+import { getLanguageColor } from "@/lib/github-utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { CreateRepoDialog } from "@/components/repo/create-repo-dialog";
 
@@ -52,26 +53,6 @@ export interface OrgRepo {
 
 type FilterType = "all" | "public" | "private" | "forks" | "archived";
 type SortType = "updated" | "name" | "stars";
-
-const languageColors: Record<string, string> = {
-	TypeScript: "#3178c6",
-	JavaScript: "#f1e05a",
-	Python: "#3572A5",
-	Rust: "#dea584",
-	Go: "#00ADD8",
-	Java: "#b07219",
-	Ruby: "#701516",
-	Swift: "#F05138",
-	Kotlin: "#A97BFF",
-	"C++": "#f34b7d",
-	"C#": "#178600",
-	PHP: "#4F5D95",
-	Vue: "#41b883",
-	Svelte: "#ff3e00",
-	HTML: "#e34c26",
-	CSS: "#563d7c",
-	Shell: "#89e051",
-};
 
 function formatJoinedDate(value: string | null): string | null {
 	if (!value) return null;
@@ -300,9 +281,9 @@ export function OrgDetailContent({ org, repos }: { org: OrgDetails; repos: OrgRe
 								className="w-2 h-2 rounded-full"
 								style={{
 									backgroundColor:
-										languageColors[
-											lang || ""
-										] || "#8b949e",
+										getLanguageColor(
+											lang,
+										),
 								}}
 							/>
 							{lang}
@@ -315,7 +296,7 @@ export function OrgDetailContent({ org, repos }: { org: OrgDetails; repos: OrgRe
 			<div className="flex-1 min-h-0 overflow-y-auto border border-border rounded-md divide-y divide-border/50">
 				{filtered.map((repo) => {
 					const langColor = repo.language
-						? languageColors[repo.language] || "#8b949e"
+						? getLanguageColor(repo.language)
 						: null;
 					return (
 						<Link

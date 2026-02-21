@@ -83,7 +83,7 @@ export async function createPromptRequest(
 }
 
 export async function getPromptRequest(id: string): Promise<PromptRequest | null> {
-	const row = await prisma.promptRequest.findUnique({ where: { id }, cacheStrategy: { swr: 10 } });
+	const row = await prisma.promptRequest.findUnique({ where: { id } });
 	return row ? toPromptRequest(row) : null;
 }
 
@@ -95,7 +95,6 @@ export async function listPromptRequests(
 	const rows = await prisma.promptRequest.findMany({
 		where: { owner, repo, ...(opts?.status ? { status: opts.status } : {}) },
 		orderBy: { createdAt: "desc" },
-		cacheStrategy: { swr: 10 },
 	});
 	return rows.map(toPromptRequest);
 }
@@ -107,7 +106,6 @@ export async function countPromptRequests(
 ): Promise<number> {
 	return prisma.promptRequest.count({
 		where: { owner, repo, ...(status ? { status } : {}) },
-		cacheStrategy: { swr: 10 },
 	});
 }
 

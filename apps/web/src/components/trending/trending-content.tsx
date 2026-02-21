@@ -5,46 +5,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { Star, GitFork, Flame } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
-
-interface TrendingRepo {
-	id: number;
-	name: string;
-	full_name: string;
-	description: string | null;
-	html_url: string;
-	stargazers_count: number;
-	forks_count: number;
-	language: string | null;
-	created_at: string | null;
-	owner: { login: string; avatar_url: string };
-}
-
-const langColor: Record<string, string> = {
-	TypeScript: "#3178c6",
-	JavaScript: "#f1e05a",
-	Python: "#3572A5",
-	Rust: "#dea584",
-	Go: "#00ADD8",
-	Java: "#b07219",
-	Ruby: "#701516",
-	Swift: "#F05138",
-	Kotlin: "#A97BFF",
-	"C++": "#f34b7d",
-	"C#": "#178600",
-	PHP: "#4F5D95",
-	Vue: "#41b883",
-	Svelte: "#ff3e00",
-	HTML: "#e34c26",
-	CSS: "#563d7c",
-	Shell: "#89e051",
-};
+import { getLanguageColor } from "@/lib/github-utils";
+import type { TrendingRepoItem } from "@/lib/github-types";
 
 type Period = "daily" | "weekly" | "monthly";
 
 interface TrendingContentProps {
-	weekly: TrendingRepo[];
-	daily: TrendingRepo[];
-	monthly: TrendingRepo[];
+	weekly: TrendingRepoItem[];
+	daily: TrendingRepoItem[];
+	monthly: TrendingRepoItem[];
 }
 
 export function TrendingContent({ weekly, daily, monthly }: TrendingContentProps) {
@@ -92,22 +61,22 @@ export function TrendingContent({ weekly, daily, monthly }: TrendingContentProps
 							<span className="text-[11px] font-mono text-muted-foreground/30 tabular-nums w-5 text-right shrink-0 pt-1">
 								{i + 1}
 							</span>
-							<Image
-								src={repo.owner.avatar_url}
-								alt={repo.owner.login}
-								width={32}
-								height={32}
-								className="rounded-sm shrink-0 w-8 h-8 object-cover mt-0.5"
-							/>
-							<div className="flex-1 min-w-0">
-								<div className="flex items-center gap-2">
-									<span className="text-sm font-mono truncate group-hover:text-foreground transition-colors">
-										<span className="text-muted-foreground/50">
-											{
-												repo
-													.owner
-													.login
-											}
+						<Image
+							src={repo.owner?.avatar_url ?? ""}
+							alt={repo.owner?.login ?? ""}
+							width={32}
+							height={32}
+							className="rounded-sm shrink-0 w-8 h-8 object-cover mt-0.5"
+						/>
+						<div className="flex-1 min-w-0">
+							<div className="flex items-center gap-2">
+								<span className="text-sm font-mono truncate group-hover:text-foreground transition-colors">
+									<span className="text-muted-foreground/50">
+										{
+											repo
+												.owner
+												?.login
+										}
 										</span>
 										<span className="text-muted-foreground/30 mx-0.5">
 											/
@@ -129,11 +98,9 @@ export function TrendingContent({ weekly, daily, monthly }: TrendingContentProps
 												className="w-2 h-2 rounded-full shrink-0"
 												style={{
 													backgroundColor:
-														langColor[
-															repo
-																.language
-														] ||
-														"#8b949e",
+														getLanguageColor(
+															repo.language,
+														),
 												}}
 											/>
 											{

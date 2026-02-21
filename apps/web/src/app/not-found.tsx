@@ -7,7 +7,6 @@ import { Logo } from "@/components/ui/logo";
 export default function NotFound() {
 	return (
 		<div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden px-4">
-			{/* Subtle grid background */}
 			<div
 				className="absolute inset-0 pointer-events-none opacity-[0.03]"
 				style={{
@@ -17,7 +16,6 @@ export default function NotFound() {
 				}}
 			/>
 
-			{/* Radial glow */}
 			<div
 				className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
 				style={{
@@ -25,21 +23,16 @@ export default function NotFound() {
 				}}
 			/>
 
-			{/* Content */}
 			<div className="relative z-10 flex flex-col items-center text-center max-w-md">
-				{/* Glitch 404 */}
 				<Glitch404 />
 
-				{/* Divider */}
 				<div className="w-12 h-px bg-border my-6" />
 
-				{/* Message */}
 				<p className="text-sm text-muted-foreground/70 leading-relaxed">
 					This page doesn&apos;t exist, or you don&apos;t have
 					<br className="hidden sm:block" /> permission to access it.
 				</p>
 
-				{/* Actions */}
 				<div className="flex items-center gap-3 mt-8">
 					<Link
 						href="/dashboard"
@@ -55,7 +48,6 @@ export default function NotFound() {
 					</button>
 				</div>
 
-				{/* Footer */}
 				<div className="mt-16">
 					<Logo className="h-3 text-muted-foreground/20" />
 				</div>
@@ -72,7 +64,6 @@ function Glitch404() {
 		const triggerGlitch = () => {
 			setGlitch(true);
 			setTimeout(() => setGlitch(false), 150);
-			// Random interval between 3-8 seconds
 			intervalRef.current = setTimeout(
 				triggerGlitch,
 				3000 + Math.random() * 5000,
@@ -86,7 +77,6 @@ function Glitch404() {
 
 	return (
 		<div className="relative select-none">
-			{/* Shadow layers for glitch */}
 			{glitch && (
 				<>
 					<span
@@ -119,7 +109,6 @@ function Glitch404() {
 				404
 			</h1>
 
-			{/* Scanline on top */}
 			{glitch && (
 				<div
 					className="absolute inset-0 pointer-events-none"

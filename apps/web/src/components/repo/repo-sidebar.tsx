@@ -6,26 +6,19 @@ import {
   Lock,
   Globe,
 
-  GitBranch,
   GitCommit,
   Scale,
   Archive,
-  Users,
   Link as LinkIcon,
   HardDrive,
 } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { formatBytes } from "@/lib/github-utils";
-import { SidebarBranchSwitcher } from "@/components/repo/sidebar-branch-switcher";
 import { StarButton } from "@/components/repo/star-button";
-
-interface Contributor {
-  login: string;
-  avatar_url: string;
-  contributions: number;
-  html_url: string;
-}
+import { SidebarLanguages } from "@/components/repo/sidebar-languages";
+import { SidebarContributors } from "@/components/repo/sidebar-contributors";
+import type { ContributorAvatar } from "@/lib/repo-data-cache";
 
 interface LatestCommit {
   sha: string;
@@ -56,10 +49,9 @@ interface RepoSidebarProps {
   archived: boolean;
   fork: boolean;
   parent: { fullName: string; owner: string; name: string } | null;
-  contributors: Contributor[];
-  contributorsTotalCount: number;
+  initialContributors: ContributorAvatar[] | null;
+  initialLanguages: Record<string, number> | null;
   latestCommit: LatestCommit | null;
-  branches: { name: string }[];
   isStarred: boolean;
 }
 
@@ -85,10 +77,9 @@ export function RepoSidebar({
   archived,
   fork,
   parent,
-  contributors,
-  contributorsTotalCount,
+  initialContributors,
+  initialLanguages,
   latestCommit,
-  branches,
   isStarred,
 }: RepoSidebarProps) {
   const badges = [
@@ -258,19 +249,6 @@ export function RepoSidebar({
               </div>
             )}
             <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 text-muted-foreground/70">
-                <GitBranch className="w-3 h-3" />
-                Branch
-              </span>
-              <SidebarBranchSwitcher
-                owner={owner}
-                repo={repoName}
-                currentBranch={defaultBranch}
-                branches={branches}
-                defaultBranch={defaultBranch}
-              />
-            </div>
-            <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground/70">Last push</span>
               <span className="font-mono text-muted-foreground">
                 <TimeAgo date={pushedAt} />
@@ -307,44 +285,19 @@ export function RepoSidebar({
         </div>
 
 
-        {/* Contributors */}
-        {contributors.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground/70">
-              <span className="flex items-center gap-1.5">
-                <Users className="w-3 h-3" />
-                Contributors
-                <span className="text-muted-foreground/70">{contributorsTotalCount}</span>
-              </span>
-            </span>
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                {contributors.map((c, i) => (
-                  <a
-                    key={c.login}
-                    href={`/users/${c.login}`}
-                    title={`${c.login} (${c.contributions})`}
-                    className="relative hover:z-10 hover:-translate-y-0.5 transition-transform"
-                    style={{ zIndex: contributors.length - i }}
-                  >
-                    <Image
-                      src={c.avatar_url}
-                      alt={c.login}
-                      width={26}
-                      height={26}
-                      className="rounded-full border-2 border-background ring-1 ring-border"
-                    />
-                  </a>
-                ))}
-              </div>
-              {contributorsTotalCount > contributors.length && (
-                <span className="text-[10px] font-mono text-muted-foreground/70">
-                  +{contributorsTotalCount - contributors.length}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Languages (client-fetched) */}
+        <SidebarLanguages
+          owner={owner}
+          repo={repoName}
+          initialLanguages={initialLanguages}
+        />
+
+        {/* Contributors (client-fetched) */}
+        <SidebarContributors
+          owner={owner}
+          repo={repoName}
+          initialAvatars={initialContributors}
+        />
       </aside>
 
       {/* Mobile compact header */}

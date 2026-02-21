@@ -63,7 +63,6 @@ export async function getExistingContentHash(
 	const row = await prisma.searchEmbedding.findUnique({
 		where: { id },
 		select: { contentHash: true },
-		cacheStrategy: { ttl: 120 },
 	});
 	return row?.contentHash ?? null;
 }
