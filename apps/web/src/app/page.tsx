@@ -15,7 +15,7 @@ export default async function HomePage() {
 
 	return (
 		<div
-			className="min-h-screen bg-background flex flex-col"
+			className="relative min-h-screen bg-background"
 			style={
 				{
 					"--background": "#030304",
@@ -28,24 +28,24 @@ export default async function HomePage() {
 				} as React.CSSProperties
 			}
 		>
-			{/* Shader panel */}
+			{/* Shader — full screen */}
 			<div
-				className="relative h-[40vh] sm:h-[45vh] lg:h-[50vh] overflow-hidden shrink-0"
+				className="absolute inset-0 overflow-hidden"
 				style={{ background: "var(--shader-bg)" }}
 			>
 				<HalftoneBackground />
 
-				{/* Bottom fade into content */}
+				{/* Bottom fade */}
 				<div
-					className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none z-10"
+					className="absolute inset-x-0 bottom-0 h-1/3 pointer-events-none z-10"
 					style={{
 						background: "linear-gradient(to top, var(--background) 0%, transparent 100%)",
 					}}
 				/>
 			</div>
 
-			{/* Content */}
-			<div className="flex-1 flex flex-col items-center px-6 pb-16 -mt-24 sm:-mt-32 lg:-mt-40 relative z-20">
+			{/* Content — centered on screen */}
+			<div className="relative z-20 min-h-screen flex items-center justify-center px-6">
 				<style>{`
 					@keyframes heroFadeUp {
 						from { opacity: 0; transform: translateY(12px); filter: blur(4px); }

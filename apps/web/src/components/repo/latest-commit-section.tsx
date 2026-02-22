@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { GitCommit } from "lucide-react";
@@ -36,6 +36,14 @@ export function LatestCommitSection({
 }: LatestCommitSectionProps) {
 	const [commit, setCommit] = useState(initialCommit);
 	const [, startTransition] = useTransition();
+
+	// Fetch fresh latest commit on every mount (page load)
+	useEffect(() => {
+		startTransition(async () => {
+			const latest = await fetchLatestCommit(owner, repoName);
+			if (latest) setCommit(latest);
+		});
+	}, [owner, repoName]);
 
 	useMutationSubscription(
 		[...COMMIT_EVENTS],

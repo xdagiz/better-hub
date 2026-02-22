@@ -1,7 +1,15 @@
 import { getRepoPageData } from "@/lib/github";
 import { TrackView } from "@/components/shared/track-view";
-import { RepoOverview } from "@/components/repo/repo-overview";
+import { RepoOverview, type RepoOverviewProps } from "@/components/repo/repo-overview";
 import { getCachedReadmeHtml } from "@/lib/readme-cache";
+import {
+	getCachedOverviewPRs,
+	getCachedOverviewIssues,
+	getCachedOverviewEvents,
+	getCachedOverviewCommitActivity,
+	getCachedOverviewCI,
+} from "@/lib/repo-data-cache";
+import { fetchPinnedItemsForRepo } from "./pin-actions";
 import { revalidateReadme } from "./readme-actions";
 
 export default async function RepoPage({
@@ -18,10 +26,34 @@ export default async function RepoPage({
 	const { permissions } = repoData;
 	const isMaintainer = permissions.push || permissions.admin || permissions.maintain;
 
-	let readmeHtml = await getCachedReadmeHtml(owner, repo);
-	if (readmeHtml === null) {
-		readmeHtml = await revalidateReadme(owner, repo, repoData.default_branch);
-	}
+	// Cache data is opaque to the server — passed through as initialData to client useQuery hooks
+	const [
+		readmeHtmlRaw,
+		initialPRs,
+		initialIssues,
+		initialEvents,
+		initialCommitActivity,
+		initialCIStatus,
+		initialPinnedItems,
+	] = await Promise.all([
+		getCachedReadmeHtml(owner, repo),
+		isMaintainer ? getCachedOverviewPRs(owner, repo) : null,
+		isMaintainer ? getCachedOverviewIssues(owner, repo) : null,
+		isMaintainer ? getCachedOverviewEvents(owner, repo) : null,
+		isMaintainer ? getCachedOverviewCommitActivity(owner, repo) : null,
+		isMaintainer ? getCachedOverviewCI(owner, repo) : null,
+		isMaintainer ? fetchPinnedItemsForRepo(owner, repo) : null,
+	]) as [
+		string | null,
+		RepoOverviewProps["initialPRs"],
+		RepoOverviewProps["initialIssues"],
+		RepoOverviewProps["initialEvents"],
+		RepoOverviewProps["initialCommitActivity"],
+		RepoOverviewProps["initialCIStatus"],
+		RepoOverviewProps["initialPinnedItems"],
+	];
+
+	const readmeHtml = readmeHtmlRaw ?? await revalidateReadme(owner, repo, repoData.default_branch);
 
 	return (
 		<div className={isMaintainer ? "flex flex-col flex-1 min-h-0" : undefined}>
@@ -41,6 +73,12 @@ export default async function RepoPage({
 				openIssueCount={navCounts.openIssues}
 				defaultBranch={repoData.default_branch}
 				initialReadmeHtml={readmeHtml}
+				initialPRs={initialPRs}
+				initialIssues={initialIssues}
+				initialEvents={initialEvents}
+				initialCommitActivity={initialCommitActivity}
+				initialCIStatus={initialCIStatus}
+				initialPinnedItems={initialPinnedItems}
 			/>
 		</div>
 	);
