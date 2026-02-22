@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -371,7 +371,7 @@ export function IssueCommentForm({
 							{/* Comment button */}
 							<button
 								onClick={handleSubmit}
-								disabled={isPending || !body.trim()}
+								disabled={!body.trim()}
 								className={cn(
 									"flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md",
 									"border border-border",
@@ -380,11 +380,7 @@ export function IssueCommentForm({
 									"disabled:opacity-40 disabled:cursor-not-allowed",
 								)}
 							>
-								{isPending ? (
-									<Loader2 className="w-3.5 h-3.5 animate-spin" />
-								) : (
-									<CornerDownLeft className="w-3.5 h-3.5" />
-								)}
+								<CornerDownLeft className="w-3.5 h-3.5" />
 								Comment
 							</button>
 						</div>
