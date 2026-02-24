@@ -84,7 +84,7 @@ export function ExtensionInstallDialog({ open, onOpenChange }: ExtensionInstallD
 				{/* Download section */}
 				<div className="px-5 pb-4">
 					<a
-						href="/extension/better-hub-chrome.zip"
+						href="/api/extension-download"
 						download
 						onClick={() => setDownloaded(true)}
 						className={cn(

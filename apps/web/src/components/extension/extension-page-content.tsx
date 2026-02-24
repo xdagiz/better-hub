@@ -115,7 +115,7 @@ export function ExtensionPageContent() {
 				{/* Download button */}
 				<div className="mt-6 flex items-center gap-3">
 					<a
-						href="/extension/better-hub-chrome.zip"
+						href="/api/extension-download"
 						download
 						onClick={() => setDownloaded(true)}
 						className={cn(
