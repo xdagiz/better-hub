@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
 	Bell,
@@ -12,10 +12,12 @@ import {
 	Tag,
 	Clock,
 	Check,
+	Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import type { NotificationItem } from "@/lib/github-types";
+import { markNotificationDone, markAllNotificationsRead } from "@/app/(app)/repos/actions";
 
 type FilterType = "all" | "unread" | "participating" | "mention";
 
@@ -57,8 +59,13 @@ function getNotificationHref(notif: NotificationItem): string | null {
 
 export function NotificationsContent({ notifications }: { notifications: NotificationItem[] }) {
 	const [filter, setFilter] = useState<FilterType>("all");
+	const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+	const [markingAll, startMarkAll] = useTransition();
+	const [markingId, setMarkingId] = useState<string | null>(null);
 
-	const filtered = notifications.filter((n) => {
+	const visibleNotifications = notifications.filter((n) => !doneIds.has(n.id));
+
+	const filtered = visibleNotifications.filter((n) => {
 		if (filter === "unread") return n.unread;
 		if (filter === "participating")
 			return [
@@ -73,7 +80,7 @@ export function NotificationsContent({ notifications }: { notifications: Notific
 		return true;
 	});
 
-	const unreadCount = notifications.filter((n) => n.unread).length;
+	const unreadCount = visibleNotifications.filter((n) => n.unread).length;
 
 	const grouped = filtered.reduce(
 		(acc, notif) => {
@@ -84,6 +91,17 @@ export function NotificationsContent({ notifications }: { notifications: Notific
 		},
 		{} as Record<string, NotificationItem[]>,
 	);
+
+	async function handleMarkDone(e: React.MouseEvent, notifId: string) {
+		e.preventDefault();
+		e.stopPropagation();
+		setMarkingId(notifId);
+		const res = await markNotificationDone(notifId);
+		if (res.success) {
+			setDoneIds((prev) => new Set([...prev, notifId]));
+		}
+		setMarkingId(null);
+	}
 
 	return (
 		<div className="py-4 md:py-6 max-w-[1100px] mx-auto">
@@ -99,8 +117,23 @@ export function NotificationsContent({ notifications }: { notifications: Notific
 					</p>
 				</div>
 				{unreadCount > 0 && (
-					<button className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border border-border hover:text-foreground/60 hover:bg-muted/60 dark:hover:bg-white/3 transition-colors cursor-pointer">
-						<Check className="w-3.5 h-3.5" />
+					<button
+						disabled={markingAll}
+						onClick={() => {
+							startMarkAll(async () => {
+								const res = await markAllNotificationsRead();
+								if (res.success) {
+									setDoneIds(new Set(notifications.map((n) => n.id)));
+								}
+							});
+						}}
+						className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border border-border hover:text-foreground/60 hover:bg-muted/60 dark:hover:bg-white/3 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						{markingAll ? (
+							<Loader2 className="w-3.5 h-3.5 animate-spin" />
+						) : (
+							<Check className="w-3.5 h-3.5" />
+						)}
 						Mark all read
 					</button>
 				)}
@@ -151,34 +184,28 @@ export function NotificationsContent({ notifications }: { notifications: Notific
 						</div>
 						<div className="border border-border divide-y divide-border">
 							{notifs.map((notif) => {
-								const href =
-									getNotificationHref(notif);
+								const href = getNotificationHref(notif);
+								const isMarking = markingId === notif.id;
 								return (
-									<Link
+									<div
 										key={notif.id}
-										href={href || "#"}
 										className="group flex items-start gap-3 px-4 py-3 hover:bg-muted/60 dark:hover:bg-white/3 transition-colors"
 									>
 										<div className="mt-0.5 text-muted-foreground/70">
-											{typeIcons[
-												notif
-													.subject
-													.type
-											] || (
+											{typeIcons[notif.subject.type] || (
 												<Bell className="w-3.5 h-3.5" />
 											)}
 										</div>
-										<div className="flex-1 min-w-0">
+										<Link
+											href={href || "#"}
+											className="flex-1 min-w-0"
+										>
 											<div className="flex items-center gap-2">
 												{notif.unread && (
 													<span className="w-1.5 h-1.5 rounded-full bg-foreground shrink-0" />
 												)}
 												<span className="text-sm text-foreground/90 truncate">
-													{
-														notif
-															.subject
-															.title
-													}
+													{notif.subject.title}
 												</span>
 											</div>
 											<div className="flex items-center gap-2 mt-1">
@@ -196,23 +223,29 @@ export function NotificationsContent({ notifications }: { notifications: Notific
 																: "border-border text-muted-foreground",
 													)}
 												>
-													{reasonLabels[
-														notif
-															.reason
-													] ||
-														notif.reason}
+													{reasonLabels[notif.reason] || notif.reason}
 												</span>
 												<span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
 													<Clock className="w-3 h-3" />
-													<TimeAgo
-														date={
-															notif.updated_at
-														}
-													/>
+													<TimeAgo date={notif.updated_at} />
 												</span>
 											</div>
-										</div>
-									</Link>
+										</Link>
+										{notif.unread && (
+											<button
+												disabled={isMarking}
+												onClick={(e) => handleMarkDone(e, notif.id)}
+												className="shrink-0 mt-0.5 p-1 text-muted-foreground/50 hover:text-foreground/70 transition-colors cursor-pointer disabled:opacity-50"
+												title="Mark as done"
+											>
+												{isMarking ? (
+													<Loader2 className="w-3.5 h-3.5 animate-spin" />
+												) : (
+													<Check className="w-3.5 h-3.5" />
+												)}
+											</button>
+										)}
+									</div>
 								);
 							})}
 						</div>

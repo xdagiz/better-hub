@@ -24,6 +24,8 @@ import { cn, formatNumber } from "@/lib/utils";
 import { getLanguageColor } from "@/lib/github-utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { ContributionChart } from "@/components/dashboard/contribution-chart";
+import { computeUserProfileScore } from "@/lib/user-profile-score";
+import { UserProfileScoreRing } from "@/components/users/user-profile-score-ring";
 
 export interface UserProfile {
 	login: string;
@@ -172,6 +174,25 @@ export function UserProfileContent({
 
 	const totalForks = useMemo(() => repos.reduce((sum, r) => sum + r.forks_count, 0), [repos]);
 
+	const profileScore = useMemo(() => {
+		const topRepoStars = repos.length > 0 ? Math.max(...repos.map((r) => r.stargazers_count)) : 0;
+		const languageCount = new Set(repos.map((r) => r.language).filter(Boolean)).size;
+
+		return computeUserProfileScore({
+			followers: user.followers,
+			following: user.following,
+			publicRepos: user.public_repos,
+			accountCreated: user.created_at,
+			hasBio: !!user.bio,
+			totalStars,
+			topRepoStars,
+			totalForks,
+			totalContributions: contributions?.totalContributions ?? 0,
+			orgCount: orgs.length,
+			languageCount,
+		});
+	}, [user, repos, orgs, contributions, totalStars, totalForks]);
+
 	return (
 		<div className="flex flex-col lg:flex-row gap-8 flex-1 min-h-0">
 			{/* ── Left sidebar ── */}
@@ -234,6 +255,11 @@ export function UserProfileContent({
 							</div>
 						</div>
 					))}
+				</div>
+
+				{/* Profile Score */}
+				<div className="mt-4">
+					<UserProfileScoreRing score={profileScore} />
 				</div>
 
 				{/* Followers */}

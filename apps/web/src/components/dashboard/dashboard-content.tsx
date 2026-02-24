@@ -1,7 +1,8 @@
 "use client";
 
 import { noSSR } from "foxact/no-ssr";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -77,15 +78,26 @@ export function DashboardContent({
 		myOpenPRs.items.length > 0 ||
 		myIssues.items.length > 0;
 
-	const [activeTab, setActiveTab] = useState<TabKey>("reviews");
+	const searchParams = useSearchParams();
+	const tabParam = searchParams.get("tab");
+	const validTabs: TabKey[] = ["reviews", "prs", "issues", "notifs"];
+	const initialTab: TabKey = validTabs.includes(tabParam as TabKey) ? (tabParam as TabKey) : "reviews";
+	const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
-	const handleStatClick = (tab: TabKey) => {
+	const handleStatClick = useCallback((tab: TabKey) => {
 		setActiveTab(tab);
+		const url = new URL(window.location.href);
+		if (tab === "reviews") {
+			url.searchParams.delete("tab");
+		} else {
+			url.searchParams.set("tab", tab);
+		}
+		window.history.replaceState(null, "", url.toString());
 		document.getElementById("work-tabs")?.scrollIntoView({
 			behavior: "smooth",
 			block: "nearest",
 		});
-	};
+	}, []);
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0 w-full">

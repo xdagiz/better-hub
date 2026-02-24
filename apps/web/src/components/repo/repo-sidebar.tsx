@@ -14,6 +14,7 @@ import { formatNumber } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { formatBytes } from "@/lib/github-utils";
 import { StarButton } from "@/components/repo/star-button";
+import { ForkButton } from "@/components/repo/fork-button";
 import { SidebarLanguages } from "@/components/repo/sidebar-languages";
 import { SidebarContributors } from "@/components/repo/sidebar-contributors";
 import { LatestCommitSection } from "@/components/repo/latest-commit-section";
@@ -187,18 +188,11 @@ export function RepoSidebar({
 						starred={isStarred}
 						starCount={stars}
 					/>
-					<a
-						href={`${htmlUrl}/fork`}
-						target="_blank"
-						rel="noopener noreferrer"
-						className="flex items-center justify-center gap-1.5 text-[11px] font-mono py-1.5 text-muted-foreground hover:text-foreground transition-colors"
-					>
-						<GitFork className="w-3 h-3" />
-						Fork
-						<span className="text-muted-foreground/50 tabular-nums">
-							{formatNumber(forks)}
-						</span>
-					</a>
+					<ForkButton
+						owner={owner}
+						repo={repoName}
+						forkCount={forks}
+					/>
 					<span className="flex items-center justify-center gap-1.5 text-[11px] font-mono text-muted-foreground/60">
 						<Eye className="w-3 h-3" />
 						Watchers

@@ -163,7 +163,7 @@ export function CodeContentWrapper({
 				<>
 					{/* Collapsed toggle */}
 					{collapsed && (
-						<div className="hidden lg:flex shrink-0 flex-col items-center pt-2 px-0.5">
+						<div className="hidden lg:flex shrink-0 flex-col items-center pt-2 pl-4 pr-0.5">
 							<button
 								type="button"
 								onClick={handleExpand}
@@ -178,7 +178,7 @@ export function CodeContentWrapper({
 					{/* Sidebar */}
 					{!collapsed && (
 						<div
-							className="hidden lg:flex shrink-0 border-r border-border flex-col min-h-0 overflow-hidden"
+							className="hidden lg:flex shrink-0 border-r border-border flex-col min-h-0 overflow-hidden pl-4"
 							style={{ width: sidebarWidth }}
 						>
 							<FileExplorerTree

@@ -25,12 +25,12 @@ export function AppNavbar({ session }: AppNavbarProps) {
 			<nav className="top-0 flex h-full items-center justify-between border-border px-2 sm:px-4 border-b">
 				<div className="flex items-center gap-0" id="navbar-breadcrumb">
 					<Link
-						className="shrink-0 flex text-foreground gap-1 transition-colors text-xs tracking-tight"
+						className="shrink-0 flex items-center text-foreground gap-1.5 transition-colors text-xs tracking-tight"
 						href="/dashboard"
 					>
 						<svg
-							width="20"
-							height="20"
+							width="16"
+							height="16"
 							viewBox="0 0 65 65"
 							fill="none"
 							xmlns="http://www.w3.org/2000/svg"

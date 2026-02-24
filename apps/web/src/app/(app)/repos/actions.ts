@@ -31,6 +31,53 @@ export async function unstarRepo(owner: string, repo: string) {
 	}
 }
 
+export async function forkRepo(
+	owner: string,
+	repo: string,
+	organization?: string,
+): Promise<{ success: boolean; full_name?: string; error?: string }> {
+	const octokit = await getOctokit();
+	if (!octokit) return { success: false, error: "Not authenticated" };
+	try {
+		const { data } = await octokit.repos.createFork({
+			owner,
+			repo,
+			...(organization ? { organization } : {}),
+		});
+		revalidatePath("/dashboard");
+		return { success: true, full_name: data.full_name };
+	} catch (e: unknown) {
+		return {
+			success: false,
+			error: getErrorMessage(e) || "Failed to fork repository",
+		};
+	}
+}
+
+export async function markNotificationDone(threadId: string) {
+	const octokit = await getOctokit();
+	if (!octokit) return { error: "Not authenticated" };
+	try {
+		await octokit.activity.markThreadAsRead({ thread_id: Number(threadId) });
+		revalidatePath("/notifications");
+		return { success: true };
+	} catch (e: unknown) {
+		return { error: getErrorMessage(e) || "Failed to mark notification as done" };
+	}
+}
+
+export async function markAllNotificationsRead() {
+	const octokit = await getOctokit();
+	if (!octokit) return { error: "Not authenticated" };
+	try {
+		await octokit.activity.markNotificationsAsRead();
+		revalidatePath("/notifications");
+		return { success: true };
+	} catch (e: unknown) {
+		return { error: getErrorMessage(e) || "Failed to mark all as read" };
+	}
+}
+
 export async function createRepo(
 	name: string,
 	description: string,
