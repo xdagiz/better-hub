@@ -95,6 +95,7 @@ export function PRsContent({
 			const q = search.toLowerCase();
 			list = list.filter(
 				(pr) =>
+					pr.number.toString().includes(q) ||
 					pr.title.toLowerCase().includes(q) ||
 					pr.user?.login.toLowerCase().includes(q) ||
 					extractRepoName(pr.repository_url)

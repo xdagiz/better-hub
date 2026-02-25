@@ -201,6 +201,22 @@ export function PRDiffViewer({
 		window.history.replaceState(null, "", url.toString());
 	}, [sidebarMode]);
 
+	// Listen for Ghost chat file navigation events
+	useEffect(() => {
+		const handler = (e: Event) => {
+			const { filename, line } = (e as CustomEvent<{ filename: string; line?: number }>).detail;
+			const idx = files.findIndex((f) => f.filename === filename);
+			if (idx >= 0) {
+				setActiveIndex(idx);
+				if (line) {
+					setScrollToLine(line);
+				}
+			}
+		};
+		window.addEventListener("ghost:navigate-to-file", handler);
+		return () => window.removeEventListener("ghost:navigate-to-file", handler);
+	}, [files]);
+
 	const goToPrev = useCallback(() => setActiveIndex((i) => Math.max(0, i - 1)), []);
 	const goToNext = useCallback(
 		() => setActiveIndex((i) => Math.min(files.length - 1, i + 1)),

@@ -21,6 +21,25 @@ export async function fetchCommitsByDate(
 	);
 }
 
+export async function fetchCommitsPage(
+	owner: string,
+	repo: string,
+	page: number,
+	branch?: string,
+	since?: string,
+	until?: string,
+) {
+	return getRepoCommits(
+		owner,
+		repo,
+		branch || undefined,
+		page,
+		30,
+		since || undefined,
+		until || undefined,
+	);
+}
+
 export async function fetchLatestCommit(owner: string, repo: string) {
 	const commits = await getRepoCommits(owner, repo, undefined, 1, 1);
 	const c = commits[0];

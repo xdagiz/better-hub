@@ -59,12 +59,12 @@ export interface OverviewRepoEvent {
 export async function fetchOverviewPRs(owner: string, repo: string): Promise<OverviewPRItem[]> {
 	const raw = await getRepoPullRequests(owner, repo, "open");
 	if (!raw) return [];
-	const result = raw.map((pr: any) => ({
+	const result = raw.map((pr) => ({
 		number: pr.number,
 		title: pr.title,
 		user: pr.user ? { login: pr.user.login, avatar_url: pr.user.avatar_url } : null,
 		created_at: pr.created_at,
-		comments: pr.comments ?? pr.review_comments ?? 0,
+		comments: 0,
 		draft: pr.draft,
 	}));
 	await setCachedOverviewPRs(owner, repo, result);
@@ -78,8 +78,8 @@ export async function fetchOverviewIssues(
 	const raw = await getRepoIssues(owner, repo, "open");
 	if (!raw) return [];
 	const result = raw
-		.filter((item: any) => !item.pull_request)
-		.map((issue: any) => ({
+		.filter((item) => !item.pull_request)
+		.map((issue) => ({
 			number: issue.number,
 			title: issue.title,
 			user: issue.user
@@ -90,7 +90,9 @@ export async function fetchOverviewIssues(
 			reactions: issue.reactions
 				? { total_count: issue.reactions.total_count ?? 0 }
 				: undefined,
-			labels: issue.labels?.map((l: any) => ({ name: l.name, color: l.color })),
+			labels: issue.labels?.map((l) =>
+				typeof l === "string" ? { name: l } : { name: l.name, color: l.color ?? undefined },
+			),
 		}));
 	await setCachedOverviewIssues(owner, repo, result);
 	return result;

@@ -88,6 +88,16 @@ export function PRDetailLayout({
 	const handleRestoreChat = () => persistSplit(65);
 	const handleRestoreCode = () => persistSplit(65);
 
+	// When navigating to a file from conversation, ensure the code panel is visible
+	useEffect(() => {
+		const handler = () => {
+			if (codeCollapsed) persistSplit(65);
+			if (window.innerWidth < 1024) setMobileTab("diff");
+		};
+		window.addEventListener("ghost:navigate-to-file", handler);
+		return () => window.removeEventListener("ghost:navigate-to-file", handler);
+	}, [codeCollapsed, persistSplit]);
+
 	// Keyboard shortcuts: 1/[ = files, 2/] = chat
 	useEffect(() => {
 		function handleKeyDown(e: KeyboardEvent) {

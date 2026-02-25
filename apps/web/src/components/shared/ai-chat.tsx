@@ -168,128 +168,235 @@ function CopyButton({ text }: { text: string }) {
 
 /** Custom markdown components for Ghost AI responses.
  *  Rewrites github.com links to internal app routes.
- *  Adds copy button on code blocks and inline code. */
+ *  Adds copy button on code blocks and inline code.
+ *  Makes file:line references clickable when in a PR context. */
 interface HastElement {
 	tagName?: string;
 	properties?: { className?: string[] };
 	children?: HastElement[];
 }
 
-const ghostMarkdownComponents = {
-	pre: ({
-		children,
-		node,
-		...props
-	}: React.HTMLAttributes<HTMLPreElement> & { node?: HastElement }) => {
-		// Extract text content from the <code> child
-		let codeText = "";
-		const child = Array.isArray(children) ? children[0] : children;
-		if (child && typeof child === "object" && "props" in child) {
-			const codeChildren = child.props.children;
-			if (typeof codeChildren === "string") {
-				codeText = codeChildren;
-			} else if (Array.isArray(codeChildren)) {
-				codeText = codeChildren
-					.map((c: unknown) => (typeof c === "string" ? c : ""))
-					.join("");
-			}
-		}
-		// If child code has a language class, HighlightedCodeBlock handles its own wrapper
-		const nodeChildren = (node?.children ?? []) as HastElement[];
-		const codeChild = nodeChildren.find((c) => c.tagName === "code");
-		const hasLang = codeChild?.properties?.className?.some?.(
-			(c: string) => typeof c === "string" && c.startsWith("language-"),
+/**
+ * Matches file references like `src/foo.ts:42`, `lib/bar.tsx:10-20`, `path/to/file.py:L5`,
+ * `path/to/file.py:L5-L10`, or just `src/foo.ts` (filename only, no line).
+ * Captures: [fullMatch, filepath, lineSpec | undefined]
+ */
+const FILE_LINE_RE =
+	/(\b(?:[\w.@~-]+\/)+[\w.-]+\.\w+)(?::L?(\d+)(?:[–\-]L?(\d+))?)?/g;
+
+type FileNavigateFn = (filename: string, line?: number) => void;
+
+function createGhostMarkdownComponents(
+	onNavigateToFile?: FileNavigateFn,
+	knownFiles?: Set<string>,
+) {
+	/** Parse inline code text for file:line patterns and return clickable elements */
+	function renderFileRef(text: string): React.ReactNode {
+		if (!onNavigateToFile || !knownFiles || knownFiles.size === 0) return null;
+
+		FILE_LINE_RE.lastIndex = 0;
+		const match = FILE_LINE_RE.exec(text);
+		if (!match) return null;
+
+		const filepath = match[1];
+		const line = match[2] ? parseInt(match[2], 10) : undefined;
+
+		// Check if this filepath matches a known file in the PR
+		if (!knownFiles.has(filepath)) return null;
+
+		return (
+			<button
+				type="button"
+				onClick={() => onNavigateToFile(filepath, line)}
+				className="inline-flex items-center gap-0.5 font-mono text-info hover:text-info/80 hover:underline underline-offset-2 cursor-pointer transition-colors"
+				title={`Go to ${filepath}${line ? `:${line}` : ""}`}
+			>
+				<Code2 className="w-3 h-3 shrink-0 opacity-60" />
+				{text}
+			</button>
 		);
-		if (hasLang) {
+	}
+
+	/** Process text nodes to linkify file:line references in plain text */
+	function linkifyFileRefs(text: string): React.ReactNode {
+		if (!onNavigateToFile || !knownFiles || knownFiles.size === 0) return text;
+
+		FILE_LINE_RE.lastIndex = 0;
+		const parts: React.ReactNode[] = [];
+		let lastIndex = 0;
+		let match: RegExpExecArray | null;
+
+		while ((match = FILE_LINE_RE.exec(text)) !== null) {
+			const filepath = match[1];
+			if (!knownFiles.has(filepath)) continue;
+
+			const line = match[2] ? parseInt(match[2], 10) : undefined;
+			const fullMatch = match[0];
+			const start = match.index;
+
+			if (start > lastIndex) {
+				parts.push(text.slice(lastIndex, start));
+			}
+
+			parts.push(
+				<button
+					key={start}
+					type="button"
+					onClick={() => onNavigateToFile(filepath, line)}
+					className="inline-flex items-center gap-0.5 font-mono text-info hover:text-info/80 hover:underline underline-offset-2 cursor-pointer transition-colors text-[inherit]"
+					title={`Go to ${filepath}${line ? `:${line}` : ""}`}
+				>
+					<Code2 className="w-2.5 h-2.5 shrink-0 opacity-60" />
+					{fullMatch}
+				</button>,
+			);
+
+			lastIndex = start + fullMatch.length;
+		}
+
+		if (parts.length === 0) return text;
+		if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+		return <>{parts}</>;
+	}
+
+	return {
+		pre: ({
+			children,
+			node,
+			...props
+		}: React.HTMLAttributes<HTMLPreElement> & { node?: HastElement }) => {
+			let codeText = "";
+			const child = Array.isArray(children) ? children[0] : children;
+			if (child && typeof child === "object" && "props" in child) {
+				const codeChildren = child.props.children;
+				if (typeof codeChildren === "string") {
+					codeText = codeChildren;
+				} else if (Array.isArray(codeChildren)) {
+					codeText = codeChildren
+						.map((c: unknown) => (typeof c === "string" ? c : ""))
+						.join("");
+				}
+			}
+			const nodeChildren = (node?.children ?? []) as HastElement[];
+			const codeChild = nodeChildren.find((c) => c.tagName === "code");
+			const hasLang = codeChild?.properties?.className?.some?.(
+				(c: string) => typeof c === "string" && c.startsWith("language-"),
+			);
+			if (hasLang) {
+				return (
+					<div className="relative group/code">
+						{children}
+						{codeText && <CopyButton text={codeText} />}
+					</div>
+				);
+			}
 			return (
 				<div className="relative group/code">
-					{children}
+					<pre {...props}>{children}</pre>
 					{codeText && <CopyButton text={codeText} />}
 				</div>
 			);
-		}
-		return (
-			<div className="relative group/code">
-				<pre {...props}>{children}</pre>
-				{codeText && <CopyButton text={codeText} />}
+		},
+		code: ({ children, className, ...props }: React.HTMLAttributes<HTMLElement>) => {
+			// Fenced code block with language — use syntax highlighting
+			const langMatch = /language-(\w+)/.exec(className || "");
+			if (langMatch) {
+				return (
+					<HighlightedCodeBlock
+						code={String(children).replace(/\n$/, "")}
+						lang={langMatch[1]}
+					/>
+				);
+			}
+			// Inline code — check for file:line reference
+			const text = typeof children === "string" ? children : "";
+			const fileLink = text ? renderFileRef(text) : null;
+			if (fileLink) {
+				return fileLink;
+			}
+			return (
+				<span className="relative inline-flex group/code">
+					<code {...props}>{children}</code>
+					{text && (
+						<button
+							type="button"
+							onClick={() => navigator.clipboard.writeText(text)}
+							className="opacity-0 group-hover/code:opacity-100 ml-0.5 p-0.5 rounded text-muted-foreground/40 hover:text-foreground transition-all duration-150 cursor-pointer self-center"
+							title="Copy"
+						>
+							<Copy className="w-2.5 h-2.5" />
+						</button>
+					)}
+				</span>
+			);
+		},
+		// Process plain text to linkify file:line references
+		p: ({ children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => {
+			const processed = Array.isArray(children)
+				? children.map((child, i) =>
+						typeof child === "string" ? <span key={i}>{linkifyFileRefs(child)}</span> : child,
+					)
+				: typeof children === "string"
+					? linkifyFileRefs(children)
+					: children;
+			return <p {...props}>{processed}</p>;
+		},
+		li: ({ children, ...props }: React.HTMLAttributes<HTMLLIElement>) => {
+			const processed = Array.isArray(children)
+				? children.map((child, i) =>
+						typeof child === "string" ? <span key={i}>{linkifyFileRefs(child)}</span> : child,
+					)
+				: typeof children === "string"
+					? linkifyFileRefs(children)
+					: children;
+			return <li {...props}>{processed}</li>;
+		},
+		table: ({ children, ...props }: React.HTMLAttributes<HTMLTableElement>) => (
+			<div className="overflow-x-auto my-2 rounded border border-border/60">
+				<table className="w-full text-[11px]" {...props}>
+					{children}
+				</table>
 			</div>
-		);
-	},
-	code: ({ children, className, ...props }: React.HTMLAttributes<HTMLElement>) => {
-		// Fenced code block with language — use syntax highlighting
-		const match = /language-(\w+)/.exec(className || "");
-		if (match) {
-			return (
-				<HighlightedCodeBlock
-					code={String(children).replace(/\n$/, "")}
-					lang={match[1]}
-				/>
-			);
-		}
-		// Inline code — add copy on hover
-		const text = typeof children === "string" ? children : "";
-		return (
-			<span className="relative inline-flex group/code">
-				<code {...props}>{children}</code>
-				{text && (
-					<button
-						type="button"
-						onClick={() => navigator.clipboard.writeText(text)}
-						className="opacity-0 group-hover/code:opacity-100 ml-0.5 p-0.5 rounded text-muted-foreground/40 hover:text-foreground transition-all duration-150 cursor-pointer self-center"
-						title="Copy"
-					>
-						<Copy className="w-2.5 h-2.5" />
-					</button>
-				)}
-			</span>
-		);
-	},
-	table: ({ children, ...props }: React.HTMLAttributes<HTMLTableElement>) => (
-		<div className="overflow-x-auto my-2 rounded border border-border/60">
-			<table className="w-full text-[11px]" {...props}>
+		),
+		th: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
+			<th
+				className="px-2.5 py-1.5 text-left font-medium text-muted-foreground/70 bg-muted/40 border-b border-border/60"
+				{...props}
+			>
 				{children}
-			</table>
-		</div>
-	),
-	th: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
-		<th
-			className="px-2.5 py-1.5 text-left font-medium text-muted-foreground/70 bg-muted/40 border-b border-border/60"
-			{...props}
-		>
-			{children}
-		</th>
-	),
-	td: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
-		<td className="px-2.5 py-1.5 border-b border-border/30" {...props}>
-			{children}
-		</td>
-	),
-	a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-		if (href && parseGitHubUrl(href)) {
-			const internalPath = toInternalUrl(href);
-			return (
-				<Link href={internalPath} {...props}>
-					{children}
-				</Link>
-			);
-		}
-		// Check if href is already an internal app path
-		const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-		if (href && appUrl && href.startsWith(appUrl)) {
-			const path = href.slice(appUrl.replace(/\/$/, "").length);
-			return (
-				<Link href={path} {...props}>
-					{children}
-				</Link>
-			);
-		}
-		return (
-			<a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+			</th>
+		),
+		td: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
+			<td className="px-2.5 py-1.5 border-b border-border/30" {...props}>
 				{children}
-			</a>
-		);
-	},
-};
+			</td>
+		),
+		a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+			if (href && parseGitHubUrl(href)) {
+				const internalPath = toInternalUrl(href);
+				return (
+					<Link href={internalPath} {...props}>
+						{children}
+					</Link>
+				);
+			}
+			const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+			if (href && appUrl && href.startsWith(appUrl)) {
+				const path = href.slice(appUrl.replace(/\/$/, "").length);
+				return (
+					<Link href={path} {...props}>
+						{children}
+					</Link>
+				);
+			}
+			return (
+				<a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+					{children}
+				</a>
+			);
+		},
+	};
+}
 
 interface MentionableFile {
 	filename: string;
@@ -358,6 +465,8 @@ interface AIChatProps {
 	historyItems?: HistoryItem[];
 	/** Callback when a history item is clicked */
 	onLoadHistory?: (contextKey: string, title: string) => void;
+	/** Navigate to a file (and optionally a line) in the PR diff viewer */
+	onNavigateToFile?: (filename: string, line?: number) => void;
 }
 
 export function AIChat({
@@ -382,6 +491,7 @@ export function AIChat({
 	autoFocus,
 	historyItems,
 	onLoadHistory,
+	onNavigateToFile,
 }: AIChatProps) {
 	const { data: session } = useSession();
 	const globalChat = useGlobalChatOptional();
@@ -399,6 +509,21 @@ export function AIChat({
 	);
 	const pendingContextsRef = useRef<AttachedContext[] | null>(null);
 	const [historyDismissed, setHistoryDismissed] = useState(false);
+
+	// Build the set of known PR filenames for file-reference linking
+	const knownFileSet = useMemo(() => {
+		const files = new Set<string>();
+		if (mentionableFiles) {
+			for (const f of mentionableFiles) files.add(f.filename);
+		}
+		return files;
+	}, [mentionableFiles]);
+
+	// Build markdown components with file navigation support
+	const mdComponents = useMemo(
+		() => createGhostMarkdownComponents(onNavigateToFile, knownFileSet),
+		[onNavigateToFile, knownFileSet],
+	);
 
 	// Auto-focus input when requested
 	useEffect(() => {
@@ -1351,7 +1476,7 @@ export function AIChat({
 																		remarkGfm,
 																	]}
 																	components={
-																		ghostMarkdownComponents as Parameters<
+																		mdComponents as Parameters<
 																			typeof ReactMarkdown
 																		>[0]["components"]
 																	}

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { GitPullRequest, GitMerge, XCircle, GitBranch, ArrowRight, Check, X } from "lucide-react";
-import type { CheckStatus } from "@/lib/github";
+import type { CheckStatus, CrossReference } from "@/lib/github";
+import { CircleDot, ExternalLink } from "lucide-react";
 import { CheckStatusBadge } from "@/components/pr/check-status-badge";
 import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
@@ -32,6 +33,7 @@ interface PRHeaderProps {
 	repo: string;
 	canEdit?: boolean;
 	isPinned?: boolean;
+	crossRefs?: CrossReference[];
 }
 
 export function PRHeader({
@@ -55,6 +57,7 @@ export function PRHeader({
 	repo,
 	canEdit = false,
 	isPinned = false,
+	crossRefs,
 }: PRHeaderProps) {
 	const statusConfig = merged
 		? {
@@ -256,6 +259,59 @@ export function PRHeader({
 					</>
 				)}
 			</div>
+		{crossRefs && crossRefs.length > 0 && (
+			<div className="flex items-center gap-2 flex-wrap mt-2">
+				{crossRefs.map((ref) => {
+					const isLocal = ref.repoOwner === owner && ref.repoName === repo;
+					const href = isLocal
+						? `/${owner}/${repo}/${ref.isPullRequest ? "pulls" : "issues"}/${ref.number}`
+						: `/${ref.repoOwner}/${ref.repoName}/${ref.isPullRequest ? "pulls" : "issues"}/${ref.number}`;
+					return (
+						<Link
+							key={`${ref.repoOwner}/${ref.repoName}#${ref.number}`}
+							href={href}
+							className={cn(
+								"inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-mono rounded-sm transition-colors hover:bg-muted/50",
+								ref.merged
+									? "text-purple-400"
+									: ref.state === "open"
+										? "text-success"
+										: "text-alert-important",
+								!isLocal && "opacity-70",
+							)}
+						>
+							{!isLocal && <ExternalLink className="w-3 h-3 shrink-0" />}
+							{ref.isPullRequest ? (
+								<GitPullRequest className="w-3 h-3" />
+							) : (
+								<CircleDot className="w-3 h-3" />
+							)}
+							{!isLocal && (
+								<span className="text-muted-foreground/50">
+									{ref.repoOwner}/{ref.repoName}
+								</span>
+							)}
+							<span>#{ref.number}</span>
+							<span className={cn("max-w-[200px] truncate", isLocal ? "text-muted-foreground/70" : "text-muted-foreground/50")}>
+								{ref.title}
+							</span>
+							<span
+								className={cn(
+									"text-[9px] px-1 py-px rounded-sm",
+									ref.merged
+										? "bg-purple-400/10 text-purple-400"
+										: ref.state === "open"
+											? "bg-success/10 text-success"
+											: "bg-alert-important/10 text-alert-important",
+								)}
+							>
+								{ref.merged ? "merged" : ref.state}
+							</span>
+						</Link>
+					);
+				})}
+			</div>
+		)}
 		</div>
 	);
 }

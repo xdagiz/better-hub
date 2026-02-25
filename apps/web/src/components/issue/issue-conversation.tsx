@@ -51,92 +51,53 @@ function isBot(entry: IssueTimelineEntry): boolean {
 type GroupedItem =
 	| { kind: "entry"; entry: IssueTimelineEntry; index: number }
 	| { kind: "bot-group"; entries: IssueTimelineEntry[] }
-	| { kind: "author-group"; author: BaseUser; entries: IssueTimelineEntry[] }
 	| { kind: "older-activity"; entries: IssueTimelineEntry[] };
 
 /** Threshold: if more than this many human comments, collapse the middle ones */
-const OLDER_ACTIVITY_THRESHOLD = 8;
+const OLDER_ACTIVITY_THRESHOLD = 12;
 /** Keep the first N and last N human entries visible */
-const KEEP_VISIBLE = 3;
+const KEEP_VISIBLE = 4;
 
 function groupEntries(entries: IssueTimelineEntry[]): GroupedItem[] {
-	// Phase 1: separate description, bots, and human comments
-	const description =
-		entries.length > 0 && entries[0].type === "description" ? entries[0] : null;
-	const rest = description ? entries.slice(1) : entries;
-
-	// Phase 2: group bots and same-author consecutive runs
-	const rawGroups: GroupedItem[] = [];
+	const groups: GroupedItem[] = [];
 	let botBuffer: IssueTimelineEntry[] = [];
-	let authorBuffer: IssueTimelineEntry[] = [];
 
 	const flushBots = () => {
 		if (botBuffer.length === 0) return;
-		rawGroups.push({ kind: "bot-group", entries: [...botBuffer] });
+		groups.push({ kind: "bot-group", entries: [...botBuffer] });
 		botBuffer = [];
 	};
 
-	const flushAuthor = () => {
-		if (authorBuffer.length === 0) return;
-		if (authorBuffer.length === 1) {
-			rawGroups.push({ kind: "entry", entry: authorBuffer[0], index: -1 });
-		} else {
-			rawGroups.push({
-				kind: "author-group",
-				author: authorBuffer[0].user!,
-				entries: [...authorBuffer],
-			});
-		}
-		authorBuffer = [];
-	};
-
-	for (const entry of rest) {
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i];
 		if (isBot(entry)) {
-			flushAuthor();
 			botBuffer.push(entry);
 		} else {
 			flushBots();
-			const currentAuthor = entry.user?.login;
-			const bufferAuthor =
-				authorBuffer.length > 0 ? authorBuffer[0].user?.login : null;
-			if (currentAuthor && currentAuthor === bufferAuthor) {
-				authorBuffer.push(entry);
-			} else {
-				flushAuthor();
-				authorBuffer.push(entry);
-			}
+			groups.push({ kind: "entry", entry, index: i });
 		}
 	}
 	flushBots();
-	flushAuthor();
 
-	// Phase 3: prepend description
-	const groups: GroupedItem[] = [];
-	if (description) {
-		groups.push({ kind: "entry", entry: description, index: 0 });
-	}
+	// If many groups, collapse older activity
+	if (groups.length > OLDER_ACTIVITY_THRESHOLD) {
+		const head = groups.slice(0, KEEP_VISIBLE);
+		const middle = groups.slice(KEEP_VISIBLE, groups.length - KEEP_VISIBLE);
+		const tail = groups.slice(groups.length - KEEP_VISIBLE);
 
-	// Phase 4: if many groups, collapse older activity into a single group
-	if (rawGroups.length > OLDER_ACTIVITY_THRESHOLD) {
-		const head = rawGroups.slice(0, KEEP_VISIBLE);
-		const middle = rawGroups.slice(KEEP_VISIBLE, rawGroups.length - KEEP_VISIBLE);
-		const tail = rawGroups.slice(rawGroups.length - KEEP_VISIBLE);
-
-		// Flatten middle groups into entries for the older-activity wrapper
 		const middleEntries: IssueTimelineEntry[] = [];
 		for (const g of middle) {
 			if (g.kind === "entry") middleEntries.push(g.entry);
-			else if (g.kind === "bot-group" || g.kind === "author-group")
+			else if (g.kind === "bot-group")
 				middleEntries.push(...g.entries);
 		}
 
-		groups.push(...head);
+		const result: GroupedItem[] = [...head];
 		if (middleEntries.length > 0) {
-			groups.push({ kind: "older-activity", entries: middleEntries });
+			result.push({ kind: "older-activity", entries: middleEntries });
 		}
-		groups.push(...tail);
-	} else {
-		groups.push(...rawGroups);
+		result.push(...tail);
+		return result;
 	}
 
 	return groups;
@@ -156,368 +117,307 @@ export function IssueConversation({
 	const grouped = groupEntries(entries);
 
 	return (
-		<div className="space-y-3">
-			{grouped.map((item, gi) => {
-				if (item.kind === "bot-group") {
-					const botNames = [
-						...new Set(item.entries.map((e) => e.user!.login)),
-					];
-					const avatars = [
-						...new Set(
-							item.entries.map((e) => e.user!.avatar_url),
-						),
-					];
-					return (
-						<BotActivityGroup
-							key={`bot-group-${gi}`}
-							count={item.entries.length}
-							botNames={botNames}
-							avatars={avatars}
-						>
-							<div className="space-y-2">
-								{item.entries.map((entry) => (
-									<ChatMessage
-										key={
-											entry.type ===
-											"description"
-												? entry.id
-												: `comment-${entry.id}`
-										}
-										entry={entry}
-										isFirst={false}
-										owner={owner}
-										repo={repo}
-										issueNumber={
-											issueNumber
-										}
-									/>
-								))}
-							</div>
-						</BotActivityGroup>
-					);
-				}
-
-				if (item.kind === "author-group") {
-					return (
-						<AuthorGroup
-							key={`author-${gi}`}
-							author={item.author}
-						>
-							{item.entries.map((entry) => (
-								<ChatMessage
-									key={
-										entry.type ===
-										"description"
-											? entry.id
-											: `comment-${entry.id}`
-									}
-									entry={entry}
-									isFirst={false}
-									owner={owner}
-									repo={repo}
-									issueNumber={issueNumber}
-									compact
-								/>
-							))}
-						</AuthorGroup>
-					);
-				}
-
-				if (item.kind === "older-activity") {
-					const avatars = [
-						...new Set(
-							item.entries
-								.filter((e) => e.user)
-								.map((e) => e.user!.avatar_url),
-						),
-					];
-					return (
-						<OlderActivityGroup
-							key={`older-${gi}`}
-							count={item.entries.length}
-							participantAvatars={avatars}
-						>
-							{item.entries.map((entry) => (
-								<ChatMessage
-									key={
-										entry.type ===
-										"description"
-											? entry.id
-											: `comment-${entry.id}`
-									}
-									entry={entry}
-									isFirst={false}
-									owner={owner}
-									repo={repo}
-									issueNumber={issueNumber}
-								/>
-							))}
-						</OlderActivityGroup>
-					);
-				}
-
-				const { entry, index } = item;
-				return (
-					<ChatMessage
-						key={
-							entry.type === "description"
-								? entry.id
-								: `comment-${entry.id}`
-						}
-						entry={entry}
-						isFirst={index === 0}
-						owner={owner}
-						repo={repo}
-						issueNumber={issueNumber}
-					/>
-				);
-			})}
-
-			{entries.length === 0 && (
-				<div className="py-8 text-center">
-					<p className="text-sm text-muted-foreground/40">
-						No conversation yet
-					</p>
-				</div>
+		<div className="relative">
+			{/* Timeline connector line */}
+			{grouped.length > 1 && (
+				<div className="absolute left-[19px] top-10 bottom-4 w-px bg-border/50" />
 			)}
-		</div>
-	);
-}
 
-function AuthorGroup({ author, children }: { author: BaseUser; children: React.ReactNode }) {
-	return (
-		<div className="rounded-lg border border-border/60 overflow-hidden">
-			<div className="flex items-center gap-2 px-3 py-1.5 bg-card/50 border-b border-border/60">
-				<Link
-					href={`/users/${author.login}`}
-					className="flex items-center gap-2 hover:text-foreground transition-colors"
-				>
-					<Image
-						src={author.avatar_url}
-						alt={author.login}
-						width={16}
-						height={16}
-						className="rounded-full shrink-0"
-					/>
-					<span className="text-xs font-medium text-foreground/80">
-						{author.login}
-					</span>
-				</Link>
-				<span className="text-[10px] text-muted-foreground/40">thread</span>
+			<div className="space-y-4">
+				{grouped.map((item, gi) => {
+					if (item.kind === "bot-group") {
+						const botNames = [
+							...new Set(item.entries.map((e) => e.user!.login)),
+						];
+						const avatars = [
+							...new Set(
+								item.entries.map((e) => e.user!.avatar_url),
+							),
+						];
+						return (
+							<div key={`bot-group-${gi}`} className="relative pl-12">
+								<BotActivityGroup
+									count={item.entries.length}
+									botNames={botNames}
+									avatars={avatars}
+								>
+									<div className="space-y-3">
+										{item.entries.map((entry) => (
+											<ThreadComment
+												key={`comment-${entry.id}`}
+												entry={entry}
+												owner={owner}
+												repo={repo}
+												issueNumber={issueNumber}
+											/>
+										))}
+									</div>
+								</BotActivityGroup>
+							</div>
+						);
+					}
+
+					if (item.kind === "older-activity") {
+						const avatars = [
+							...new Set(
+								item.entries
+									.filter((e) => e.user)
+									.map((e) => e.user!.avatar_url),
+							),
+						];
+						return (
+							<div key={`older-${gi}`} className="relative pl-12">
+								<OlderActivityGroup
+									count={item.entries.length}
+									participantAvatars={avatars}
+								>
+									{item.entries.map((entry) => (
+										<ThreadComment
+											key={
+												entry.type === "description"
+													? entry.id
+													: `comment-${entry.id}`
+											}
+											entry={entry}
+											owner={owner}
+											repo={repo}
+											issueNumber={issueNumber}
+										/>
+									))}
+								</OlderActivityGroup>
+							</div>
+						);
+					}
+
+					const { entry } = item;
+					const isDescription = entry.type === "description";
+
+					return (
+						<ThreadEntry
+							key={
+								isDescription
+									? "description"
+									: `comment-${entry.id}`
+							}
+							entry={entry}
+							isDescription={isDescription}
+							owner={owner}
+							repo={repo}
+							issueNumber={issueNumber}
+						/>
+					);
+				})}
+
+				{entries.length === 0 && (
+					<div className="py-8 text-center">
+						<p className="text-sm text-muted-foreground/40">
+							No conversation yet
+						</p>
+					</div>
+				)}
 			</div>
-			<div className="divide-y divide-border/30">{children}</div>
 		</div>
 	);
 }
 
-function ChatMessage({
+function ThreadEntry({
 	entry,
-	isFirst,
+	isDescription,
 	owner,
 	repo,
 	issueNumber,
-	compact,
 }: {
 	entry: IssueTimelineEntry;
-	isFirst: boolean;
+	isDescription: boolean;
 	owner: string;
 	repo: string;
 	issueNumber: number;
-	compact?: boolean;
 }) {
-	const hasBody = entry.body && entry.body.trim().length > 0;
+	const hasBody = Boolean(entry.body && entry.body.trim().length > 0);
 	const isLong = hasBody && entry.body.length > 800;
 
 	const renderedBody = entry.bodyHtml ? (
 		<MarkdownCopyHandler>
 			<div
-				className="ghmd ghmd-sm"
+				className="ghmd"
 				dangerouslySetInnerHTML={{ __html: entry.bodyHtml }}
 			/>
 		</MarkdownCopyHandler>
 	) : null;
 
-	if (compact) {
-		return (
-			<div className="px-3 py-2">
-				<div className="flex items-center gap-2 mb-1">
-					<span className="text-[10px] text-muted-foreground/40">
-						<TimeAgo date={entry.created_at} />
-					</span>
-					{entry.type === "comment" &&
-						entry.author_association &&
-						entry.author_association !== "NONE" && (
-							<span className="text-[9px] px-1 py-px border border-border/60 text-muted-foreground/50 rounded">
-								{entry.author_association.toLowerCase()}
-							</span>
-						)}
-				</div>
-				{hasBody && renderedBody ? (
-					isLong ? (
+	return (
+		<div className="flex gap-3 relative">
+			{/* Avatar */}
+			<div className="shrink-0 relative z-10">
+				{entry.user ? (
+					<Link href={`/users/${entry.user.login}`}>
+						<Image
+							src={entry.user.avatar_url}
+							alt={entry.user.login}
+							width={40}
+							height={40}
+							className={cn(
+								"rounded-full bg-background",
+								isDescription
+									? "ring-2 ring-border/60"
+									: "",
+							)}
+						/>
+					</Link>
+				) : (
+					<div className="w-10 h-10 rounded-full bg-muted-foreground/20" />
+				)}
+			</div>
+
+			{/* Content */}
+			<div className="flex-1 min-w-0">
+				{isDescription ? (
+					<DescriptionBlock
+						entry={entry}
+						hasBody={hasBody}
+						isLong={isLong}
+						renderedBody={renderedBody}
+						owner={owner}
+						repo={repo}
+						issueNumber={issueNumber}
+					/>
+				) : (
+					<CommentBlock
+						entry={entry as IssueCommentEntry}
+						hasBody={hasBody}
+						isLong={isLong}
+						renderedBody={renderedBody}
+						owner={owner}
+						repo={repo}
+						issueNumber={issueNumber}
+					/>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function DescriptionBlock({
+	entry,
+	hasBody,
+	isLong,
+	renderedBody,
+	owner,
+	repo,
+	issueNumber,
+}: {
+	entry: IssueTimelineEntry;
+	hasBody: boolean;
+	isLong: boolean;
+	renderedBody: React.ReactNode;
+	owner: string;
+	repo: string;
+	issueNumber: number;
+}) {
+	return (
+		<div className="border border-border/60 rounded-lg overflow-hidden">
+			<div className="flex items-center gap-2 px-3.5 py-2 border-b border-border/60 bg-card/80">
+				{entry.user && (
+					<Link
+						href={`/users/${entry.user.login}`}
+						className="text-xs font-semibold text-foreground/90 hover:text-foreground transition-colors"
+					>
+						{entry.user.login}
+					</Link>
+				)}
+				<span className="text-[11px] text-muted-foreground/50">
+					commented{" "}
+					<TimeAgo date={entry.created_at} />
+				</span>
+			</div>
+
+			{hasBody && renderedBody ? (
+				<div className="px-3.5 py-3">
+					{isLong ? (
 						<CollapsibleBody>{renderedBody}</CollapsibleBody>
 					) : (
 						renderedBody
-					)
-				) : (
-					<p className="text-xs text-muted-foreground/30 italic">
+					)}
+				</div>
+			) : (
+				<div className="px-3.5 py-4">
+					<p className="text-sm text-muted-foreground/30 italic">
 						No description provided.
 					</p>
-				)}
-				<div className="mt-1.5">
-					<ReactionDisplay
-						reactions={entry.reactions ?? {}}
-						owner={owner}
-						repo={repo}
-						contentType={
-							entry.type === "description"
-								? "issue"
-								: "issueComment"
-						}
-						contentId={
-							entry.type === "description"
-								? issueNumber
-								: (entry.id as number)
-						}
-					/>
 				</div>
+			)}
+
+			<div className="px-3.5 pb-2.5">
+				<ReactionDisplay
+					reactions={entry.reactions ?? {}}
+					owner={owner}
+					repo={repo}
+					contentType="issue"
+					contentId={issueNumber}
+				/>
 			</div>
-		);
-	}
+		</div>
+	);
+}
 
-	// Description entries don't get the actions menu
-	if (entry.type === "description") {
-		return (
-			<div className="group">
-				<div
-					className={cn(
-						"border border-border/60 rounded-lg overflow-hidden",
-						isFirst && "border-border/80",
-					)}
-				>
-					<div
-						className={cn(
-							"flex items-center gap-2 px-3 py-1.5 border-b border-border/60",
-							isFirst ? "bg-card/80" : "bg-card/50",
-						)}
-					>
-						{entry.user ? (
-							<Link
-								href={`/users/${entry.user.login}`}
-								className="flex items-center gap-2 hover:text-foreground transition-colors"
-							>
-								<Image
-									src={entry.user.avatar_url}
-									alt={entry.user.login}
-									width={16}
-									height={16}
-									className="rounded-full shrink-0"
-								/>
-								<span className="text-xs font-medium text-foreground/80">
-									{entry.user.login}
-								</span>
-							</Link>
-						) : (
-							<>
-								<div className="w-4 h-4 rounded-full bg-muted-foreground shrink-0" />
-								<span className="text-xs font-medium text-foreground/80">
-									ghost
-								</span>
-							</>
-						)}
-						<span className="text-[10px] text-muted-foreground/50">
-							opened
-						</span>
-						<span className="text-[10px] text-muted-foreground/40 ml-auto shrink-0">
-							<TimeAgo date={entry.created_at} />
-						</span>
-					</div>
-
-					{hasBody && renderedBody ? (
-						<div className="px-3 py-2.5">
-							{isLong ? (
-								<CollapsibleBody>
-									{renderedBody}
-								</CollapsibleBody>
-							) : (
-								renderedBody
-							)}
-						</div>
-					) : (
-						<div className="px-3 py-3">
-							<p className="text-xs text-muted-foreground/30 italic">
-								No description provided.
-							</p>
-						</div>
-					)}
-
-					<div className="px-3 pb-2">
-						<ReactionDisplay
-							reactions={entry.reactions ?? {}}
-							owner={owner}
-							repo={repo}
-							contentType="issue"
-							contentId={issueNumber}
-						/>
-					</div>
-				</div>
-			</div>
-		);
-	}
-
-	// Comment entries use the wrapper with actions menu
+function CommentBlock({
+	entry,
+	hasBody,
+	isLong,
+	renderedBody,
+	owner,
+	repo,
+	issueNumber,
+}: {
+	entry: IssueCommentEntry;
+	hasBody: boolean;
+	isLong: boolean;
+	renderedBody: React.ReactNode;
+	owner: string;
+	repo: string;
+	issueNumber: number;
+}) {
 	const headerContent = (
 		<>
 			{entry.user ? (
 				<Link
 					href={`/users/${entry.user.login}`}
-					className="flex items-center gap-2 hover:text-foreground transition-colors"
+					className="text-xs font-semibold text-foreground/90 hover:text-foreground transition-colors"
 				>
-					<Image
-						src={entry.user.avatar_url}
-						alt={entry.user.login}
-						width={16}
-						height={16}
-						className="rounded-full shrink-0"
-					/>
-					<span className="text-xs font-medium text-foreground/80">
-						{entry.user.login}
-					</span>
+					{entry.user.login}
 				</Link>
 			) : (
-				<>
-					<div className="w-4 h-4 rounded-full bg-muted-foreground shrink-0" />
-					<span className="text-xs font-medium text-foreground/80">
-						ghost
-					</span>
-				</>
+				<span className="text-xs font-semibold text-foreground/80">
+					ghost
+				</span>
 			)}
 			{entry.author_association && entry.author_association !== "NONE" && (
-				<span className="text-[9px] px-1 py-px border border-border/60 text-muted-foreground/50 rounded">
+				<span className="text-[9px] px-1.5 py-0.5 border border-border/60 text-muted-foreground/50 rounded font-medium">
 					{entry.author_association.toLowerCase()}
 				</span>
 			)}
-			<span className="text-[10px] text-muted-foreground/40 ml-auto shrink-0">
+			<span className="text-[11px] text-muted-foreground/50">
+				commented{" "}
 				<TimeAgo date={entry.created_at} />
 			</span>
 		</>
 	);
 
-	const bodyContent =
-		hasBody && renderedBody ? (
-			<div className="px-3 py-2.5">
-				{isLong ? (
-					<CollapsibleBody>{renderedBody}</CollapsibleBody>
-				) : (
-					renderedBody
-				)}
-			</div>
-		) : (
-			<div className="px-3 py-3">
-				<p className="text-xs text-muted-foreground/30 italic">
-					No description provided.
-				</p>
-			</div>
-		);
+	const bodyContent = hasBody && renderedBody ? (
+		<div className="px-3.5 py-3">
+			{isLong ? (
+				<CollapsibleBody>{renderedBody}</CollapsibleBody>
+			) : (
+				renderedBody
+			)}
+		</div>
+	) : (
+		<div className="px-3.5 py-4">
+			<p className="text-sm text-muted-foreground/30 italic">
+				No description provided.
+			</p>
+		</div>
+	);
 
 	const reactionsContent = (
 		<ReactionDisplay
@@ -525,7 +425,7 @@ function ChatMessage({
 			owner={owner}
 			repo={repo}
 			contentType="issueComment"
-			contentId={entry.id as number}
+			contentId={entry.id}
 		/>
 	);
 
@@ -538,8 +438,58 @@ function ChatMessage({
 			repo={repo}
 			contentType="issue"
 			issueNumber={issueNumber}
-			commentId={entry.id as number}
+			commentId={entry.id}
 			body={entry.body}
+		/>
+	);
+}
+
+function ThreadComment({
+	entry,
+	owner,
+	repo,
+	issueNumber,
+}: {
+	entry: IssueTimelineEntry;
+	owner: string;
+	repo: string;
+	issueNumber: number;
+}) {
+	const hasBody = Boolean(entry.body && entry.body.trim().length > 0);
+	const isLong = hasBody && entry.body.length > 800;
+
+	const renderedBody = entry.bodyHtml ? (
+		<MarkdownCopyHandler>
+			<div
+				className="ghmd ghmd-sm"
+				dangerouslySetInnerHTML={{ __html: entry.bodyHtml }}
+			/>
+		</MarkdownCopyHandler>
+	) : null;
+
+	if (entry.type === "description") {
+		return (
+			<DescriptionBlock
+				entry={entry}
+				hasBody={hasBody}
+				isLong={isLong}
+				renderedBody={renderedBody}
+				owner={owner}
+				repo={repo}
+				issueNumber={issueNumber}
+			/>
+		);
+	}
+
+	return (
+		<CommentBlock
+			entry={entry as IssueCommentEntry}
+			hasBody={hasBody}
+			isLong={isLong}
+			renderedBody={renderedBody}
+			owner={owner}
+			repo={repo}
+			issueNumber={issueNumber}
 		/>
 	);
 }

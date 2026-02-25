@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, FileCode2 } from "lucide-react";
+import type { Highlighter, BundledLanguage } from "shiki";
 import { cn } from "@/lib/utils";
+import { getLanguageFromFilename } from "@/lib/github-utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { ClientMarkdown } from "@/components/shared/client-markdown";
 import { ReactionDisplay, type Reactions } from "@/components/shared/reaction-display";
@@ -33,6 +35,7 @@ interface ReviewComment {
 	body: string;
 	path: string;
 	line: number | null;
+	diff_hunk: string | null;
 	reactions?: Reactions;
 }
 
@@ -46,6 +49,187 @@ interface CollapsibleReviewCardProps {
 	repo: string;
 }
 
+// ── Client-side Shiki singleton (shared with highlighted-code-block) ──
+
+let highlighterInstance: Highlighter | null = null;
+let highlighterPromise: Promise<Highlighter> | null = null;
+
+function getClientHighlighter(): Promise<Highlighter> {
+	if (highlighterInstance) return Promise.resolve(highlighterInstance);
+	if (!highlighterPromise) {
+		highlighterPromise = import("shiki")
+			.then(({ createHighlighter }) =>
+				createHighlighter({
+					themes: ["vitesse-light", "vitesse-black"],
+					langs: [],
+				}),
+			)
+			.then((h) => {
+				highlighterInstance = h;
+				return h;
+			});
+	}
+	return highlighterPromise;
+}
+
+interface SyntaxToken {
+	text: string;
+	lightColor: string;
+	darkColor: string;
+}
+
+interface ParsedDiffLine {
+	type: "add" | "remove" | "context" | "header";
+	content: string; // line content without the prefix character
+	raw: string;
+}
+
+function parseDiffHunkLines(diffHunk: string): ParsedDiffLine[] {
+	const lines = diffHunk.split("\n");
+	// Show at most the last 8 lines closest to the comment
+	const displayLines = lines.length > 8 ? lines.slice(-8) : lines;
+	return displayLines.map((raw) => {
+		if (raw.startsWith("@@")) return { type: "header", content: raw, raw };
+		if (raw.startsWith("+")) return { type: "add", content: raw.slice(1), raw };
+		if (raw.startsWith("-")) return { type: "remove", content: raw.slice(1), raw };
+		// Context lines start with a space
+		return { type: "context", content: raw.startsWith(" ") ? raw.slice(1) : raw, raw };
+	});
+}
+
+const DiffHunkSnippet = memo(function DiffHunkSnippet({
+	diffHunk,
+	filename,
+}: {
+	diffHunk: string;
+	filename: string;
+}) {
+	const parsed = parseDiffHunkLines(diffHunk);
+	const [tokensByLine, setTokensByLine] = useState<(SyntaxToken[] | null)[]>(
+		() => parsed.map(() => null),
+	);
+
+	useEffect(() => {
+		let cancelled = false;
+		(async () => {
+			try {
+				const highlighter = await getClientHighlighter();
+				const lang = getLanguageFromFilename(filename);
+				const loaded = highlighter.getLoadedLanguages();
+				let effectiveLang = lang;
+				if (!loaded.includes(lang)) {
+					try {
+						await highlighter.loadLanguage(lang as BundledLanguage);
+					} catch {
+						effectiveLang = "text";
+						if (!loaded.includes("text")) {
+							try {
+								await highlighter.loadLanguage("text" as BundledLanguage);
+							} catch {}
+						}
+					}
+				}
+
+				// Tokenize code lines (excluding headers) as a single block for
+				// accurate cross-line token context
+				const codeLines = parsed.filter((l) => l.type !== "header");
+				if (codeLines.length === 0 || cancelled) return;
+
+				const codeBlock = codeLines.map((l) => l.content).join("\n");
+				const tokenResult = highlighter.codeToTokens(codeBlock, {
+					lang: effectiveLang as BundledLanguage,
+					themes: { light: "vitesse-light", dark: "vitesse-black" },
+				});
+
+				if (cancelled) return;
+
+				// Map tokenized lines back to our parsed array
+				const result: (SyntaxToken[] | null)[] = parsed.map(() => null);
+				let codeIdx = 0;
+				for (let i = 0; i < parsed.length; i++) {
+					if (parsed[i].type === "header") continue;
+					const lineTokens = tokenResult.tokens[codeIdx];
+					if (lineTokens) {
+						result[i] = lineTokens.map((t) => ({
+							text: t.content,
+							lightColor: t.htmlStyle?.color || "",
+							darkColor: t.htmlStyle?.["--shiki-dark"] || "",
+						}));
+					}
+					codeIdx++;
+				}
+				setTokensByLine(result);
+			} catch {
+				// silently fall back to plain text
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [diffHunk, filename, parsed]);
+
+	return (
+		<div className="rounded border border-border/40 overflow-hidden text-[10px] font-mono leading-relaxed mb-1.5">
+			{parsed.map((line, i) => {
+				const tokens = tokensByLine[i];
+				return (
+					<div
+						key={i}
+						className={cn(
+							"px-2 py-px whitespace-pre overflow-x-auto flex",
+							line.type === "header" && "text-info/60 bg-info/5",
+							line.type === "add" && "bg-success/5",
+							line.type === "remove" && "bg-destructive/5",
+							line.type === "context" && "bg-transparent",
+						)}
+					>
+						{line.type === "header" ? (
+							<span>{line.raw}</span>
+						) : (
+							<>
+								<span
+									className={cn(
+										"inline-block w-3 shrink-0 select-none text-center",
+										line.type === "add" && "text-success/50",
+										line.type === "remove" && "text-destructive/50",
+										line.type === "context" && "text-transparent",
+									)}
+								>
+									{line.type === "add" ? "+" : line.type === "remove" ? "-" : " "}
+								</span>
+								<span className="pl-0.5">
+									{tokens ? (
+										tokens.map((t, ti) => (
+											<span
+												key={ti}
+												style={{
+													color: `light-dark(${t.lightColor}, ${t.darkColor})`,
+												}}
+											>
+												{t.text}
+											</span>
+										))
+									) : (
+										<span
+											className={cn(
+												line.type === "add" && "text-success/80",
+												line.type === "remove" && "text-destructive/80",
+												line.type === "context" && "text-muted-foreground/60",
+											)}
+										>
+											{line.content}
+										</span>
+									)}
+								</span>
+							</>
+						)}
+					</div>
+				);
+			})}
+		</div>
+	);
+});
+
 export function CollapsibleReviewCard({
 	user,
 	state,
@@ -58,6 +242,14 @@ export function CollapsibleReviewCard({
 	const [expanded, setExpanded] = useState(true);
 	const badge = reviewStateBadge[state] || reviewStateBadge.COMMENTED;
 	const hasContent = bodyContent || comments.length > 0;
+
+	const navigateToFile = useCallback((filename: string, line?: number | null) => {
+		window.dispatchEvent(
+			new CustomEvent("ghost:navigate-to-file", {
+				detail: { filename, line: line ?? undefined },
+			}),
+		);
+	}, []);
 
 	return (
 		<div className="group">
@@ -147,36 +339,34 @@ export function CollapsibleReviewCard({
 									className="px-3 py-2 border-b border-border/30 last:border-b-0"
 								>
 									<div className="flex items-center gap-1.5 mb-1">
-										<span className="text-[10px] text-muted-foreground/50 truncate font-mono">
-											{
-												comment.path
-											}
-											{comment.line !==
-												null &&
-												`:${comment.line}`}
-										</span>
+										<button
+											onClick={() => navigateToFile(comment.path, comment.line)}
+											className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-info transition-colors truncate font-mono cursor-pointer"
+											title={`Go to ${comment.path}${comment.line !== null ? `:${comment.line}` : ""} in diff`}
+										>
+											<FileCode2 className="w-3 h-3 shrink-0" />
+											{comment.path}
+											{comment.line !== null && `:${comment.line}`}
+										</button>
 									</div>
+									{comment.diff_hunk && (
+										<DiffHunkSnippet
+											diffHunk={comment.diff_hunk}
+											filename={comment.path}
+										/>
+									)}
 									<div className="text-xs text-foreground/70">
 										<ClientMarkdown
-											content={
-												comment.body
-											}
+											content={comment.body}
 										/>
 									</div>
 									<div className="mt-1">
 										<ReactionDisplay
-											reactions={
-												comment.reactions ??
-												{}
-											}
-											owner={
-												owner
-											}
+											reactions={comment.reactions ?? {}}
+											owner={owner}
 											repo={repo}
 											contentType="pullRequestReviewComment"
-											contentId={
-												comment.id
-											}
+											contentId={comment.id}
 										/>
 									</div>
 								</div>

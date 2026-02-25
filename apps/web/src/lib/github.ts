@@ -2363,6 +2363,7 @@ export interface PRBundleData {
 		body: string;
 		path: string;
 		line: number | null;
+		diff_hunk: string | null;
 		created_at: string;
 		user: { login: string; avatar_url: string; type?: string } | null;
 		pull_request_review_id: number;
@@ -2451,6 +2452,7 @@ const PR_BUNDLE_QUERY = `
                 path
                 line
                 originalLine
+                diffHunk
                 createdAt
                 author { __typename login avatarUrl }
                 reactionGroups {
@@ -2538,8 +2540,122 @@ function mapReactionGroups(
 	return { ...map, total_count: total };
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- GraphQL responses are untyped */
-function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
+// ── GraphQL PR Bundle response node types ──
+
+interface GQLAuthor {
+	login: string;
+	avatarUrl: string;
+	__typename: string;
+}
+
+interface GQLReactionGroup {
+	content: string;
+	reactors: { totalCount: number };
+}
+
+interface GQLLabel {
+	name: string;
+	color: string | null;
+	description: string | null;
+}
+
+interface GQLIssueComment {
+	databaseId: number;
+	body: string;
+	createdAt: string;
+	author: GQLAuthor | null;
+	authorAssociation: string;
+	reactionGroups?: GQLReactionGroup[];
+}
+
+interface GQLReviewComment {
+	databaseId: number;
+	body: string;
+	path: string;
+	line: number | null;
+	originalLine: number | null;
+	diffHunk: string | null;
+	createdAt: string;
+	author: GQLAuthor | null;
+	reactionGroups?: GQLReactionGroup[];
+}
+
+interface GQLReview {
+	databaseId: number;
+	body: string | null;
+	state: string;
+	createdAt: string;
+	submittedAt: string | null;
+	author: GQLAuthor | null;
+	comments?: { nodes: GQLReviewComment[] };
+}
+
+interface GQLThreadComment {
+	id: string;
+	databaseId: number;
+	body: string;
+	createdAt: string;
+	author: { login: string; avatarUrl: string } | null;
+	pullRequestReview?: { state: string } | null;
+}
+
+interface GQLReviewThread {
+	id: string;
+	isResolved: boolean;
+	isOutdated: boolean;
+	path: string;
+	line: number | null;
+	startLine: number | null;
+	diffSide: string;
+	resolvedBy: { login: string } | null;
+	comments?: { nodes: GQLThreadComment[] };
+}
+
+interface GQLCommitNode {
+	commit: {
+		oid: string;
+		message: string;
+		author: { name: string; date: string } | null;
+		committer: { name: string; date: string } | null;
+	};
+	resourcePath: string;
+}
+
+interface GQLTimelineItem {
+	__typename: string;
+	id: string;
+	createdAt: string;
+	actor?: { login: string; avatarUrl: string } | null;
+	mergeRefName?: string;
+}
+
+interface GQLPRNode {
+	number: number;
+	title: string;
+	body: string;
+	state: string;
+	isDraft: boolean;
+	createdAt: string;
+	mergedAt: string | null;
+	mergeable: string;
+	additions: number;
+	deletions: number;
+	changedFiles: number;
+	author: GQLAuthor | null;
+	headRefName: string;
+	headRefOid: string;
+	baseRefName: string;
+	baseRefOid: string;
+	labels?: { nodes: GQLLabel[] };
+	reactionGroups?: GQLReactionGroup[];
+	comments?: { nodes: GQLIssueComment[] };
+	reviews?: { nodes: GQLReview[] };
+	reviewThreads?: { nodes: GQLReviewThread[] };
+	commits?: { nodes: GQLCommitNode[] };
+	timelineItems?: { nodes: GQLTimelineItem[] };
+}
+
+function transformGraphQLPRBundle(node: GQLPRNode): PRBundleData {
 	const stateMap: Record<string, string> = {
 		OPEN: "open",
 		CLOSED: "closed",
@@ -2572,7 +2688,7 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 			: null,
 		head: { ref: node.headRefName, sha: node.headRefOid },
 		base: { ref: node.baseRefName, sha: node.baseRefOid },
-		labels: (node.labels?.nodes ?? []).map((l: Record<string, any>) => ({
+		labels: (node.labels?.nodes ?? []).map((l) => ({
 			name: l.name,
 			color: l.color ?? null,
 			description: l.description ?? null,
@@ -2580,7 +2696,7 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 		reactions: mapReactionGroups(node.reactionGroups),
 	};
 
-	const issueComments = (node.comments?.nodes ?? []).map((c: Record<string, any>) => ({
+	const issueComments = (node.comments?.nodes ?? []).map((c) => ({
 		id: c.databaseId,
 		body: c.body ?? "",
 		created_at: c.createdAt,
@@ -2596,7 +2712,7 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 	}));
 
 	const reviewComments: PRBundleData["reviewComments"] = [];
-	const reviews = (node.reviews?.nodes ?? []).map((r: Record<string, any>) => {
+	const reviews = (node.reviews?.nodes ?? []).map((r) => {
 		const reviewId = r.databaseId;
 		for (const rc of r.comments?.nodes ?? []) {
 			reviewComments.push({
@@ -2604,6 +2720,7 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 				body: rc.body ?? "",
 				path: rc.path ?? "",
 				line: rc.line ?? rc.originalLine ?? null,
+				diff_hunk: rc.diffHunk ?? null,
 				created_at: rc.createdAt,
 				user: rc.author
 					? {
@@ -2633,7 +2750,7 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 	});
 
 	const reviewThreads: ReviewThread[] = (node.reviewThreads?.nodes ?? []).map(
-		(thread: Record<string, any>) => ({
+		(thread) => ({
 			id: thread.id,
 			isResolved: thread.isResolved ?? false,
 			isOutdated: thread.isOutdated ?? false,
@@ -2642,7 +2759,7 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 			startLine: thread.startLine ?? null,
 			diffSide: thread.diffSide ?? "RIGHT",
 			resolvedBy: thread.resolvedBy ? { login: thread.resolvedBy.login } : null,
-			comments: (thread.comments?.nodes ?? []).map((c: Record<string, any>) => ({
+			comments: (thread.comments?.nodes ?? []).map((c) => ({
 				id: c.id,
 				databaseId: c.databaseId,
 				body: c.body ?? "",
@@ -2655,7 +2772,7 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 		}),
 	);
 
-	const commits = (node.commits?.nodes ?? []).map((n: Record<string, any>) => {
+	const commits = (node.commits?.nodes ?? []).map((n) => {
 		const c = n.commit;
 		return {
 			sha: c.oid,
@@ -2671,7 +2788,8 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 			author: null,
 		};
 	});
-	const typenameToEvent: Record<string, string> = {
+	type PRStateEvent = PRBundleData["stateEvents"][number]["event"];
+	const typenameToEvent: Record<string, PRStateEvent> = {
 		ClosedEvent: "closed",
 		ReopenedEvent: "reopened",
 		MergedEvent: "merged",
@@ -2679,15 +2797,14 @@ function transformGraphQLPRBundle(node: Record<string, any>): PRBundleData {
 		ConvertToDraftEvent: "convert_to_draft",
 	};
 	const stateEvents: PRBundleData["stateEvents"] = (node.timelineItems?.nodes ?? [])
-		.filter((n: Record<string, any>) => n && typenameToEvent[n.__typename])
-		.map((n: Record<string, any>) => ({
+		.filter((n) => n && typenameToEvent[n.__typename])
+		.map((n) => ({
 			id: n.id,
 			event: typenameToEvent[n.__typename],
 			actor: n.actor ? { login: n.actor.login, avatar_url: n.actor.avatarUrl } : null,
 			created_at: n.createdAt,
 			...(n.mergeRefName ? { merge_ref_name: n.mergeRefName } : {}),
 		}));
-	/* eslint-enable @typescript-eslint/no-explicit-any */
 
 	return { pr, issueComments, reviewComments, reviews, reviewThreads, commits, stateEvents };
 }
@@ -2777,11 +2894,28 @@ export interface LinkedPullRequest {
 	repoName: string;
 }
 
-export async function getLinkedPullRequests(
+export interface CrossReference {
+	number: number;
+	title: string;
+	state: "open" | "closed";
+	/** Only set for PRs */
+	merged: boolean;
+	isPullRequest: boolean;
+	user: { login: string; avatar_url: string } | null;
+	html_url: string;
+	repoOwner: string;
+	repoName: string;
+}
+
+/**
+ * Fetches all cross-references for an issue or PR.
+ * Returns both linked PRs and linked issues from any repo.
+ */
+export async function getCrossReferences(
 	owner: string,
 	repo: string,
 	issueNumber: number,
-): Promise<LinkedPullRequest[]> {
+): Promise<CrossReference[]> {
 	const octokit = await getOctokit();
 	if (!octokit) return [];
 
@@ -2794,7 +2928,7 @@ export async function getLinkedPullRequests(
 		});
 
 		const seen = new Set<string>();
-		const linkedPRs: LinkedPullRequest[] = [];
+		const refs: CrossReference[] = [];
 
 		for (const event of events) {
 			if (event.event !== "cross-referenced") continue;
@@ -2818,24 +2952,25 @@ export async function getLinkedPullRequests(
 					};
 				}
 			).source?.issue;
-			if (!source?.pull_request) continue;
+			if (!source) continue;
 
-			const prRepoFullName = source.repository?.full_name;
-			const prKey = prRepoFullName
-				? `${prRepoFullName}#${source.number}`
+			const repoFullName = source.repository?.full_name;
+			const key = repoFullName
+				? `${repoFullName}#${source.number}`
 				: `${source.number}`;
-			if (seen.has(prKey)) continue;
-			seen.add(prKey);
+			if (seen.has(key)) continue;
+			seen.add(key);
 
-			const [prOwner, prName] = prRepoFullName
-				? prRepoFullName.split("/")
+			const [refOwner, refName] = repoFullName
+				? repoFullName.split("/")
 				: [owner, repo];
 
-			linkedPRs.push({
+			refs.push({
 				number: source.number,
 				title: source.title,
 				state: source.state as "open" | "closed",
-				merged: !!source.pull_request.merged_at,
+				merged: !!source.pull_request?.merged_at,
+				isPullRequest: !!source.pull_request,
 				user: source.user
 					? {
 							login: source.user.login,
@@ -2843,15 +2978,36 @@ export async function getLinkedPullRequests(
 						}
 					: null,
 				html_url: source.html_url,
-				repoOwner: prOwner,
-				repoName: prName,
+				repoOwner: refOwner,
+				repoName: refName,
 			});
 		}
 
-		return linkedPRs;
+		return refs;
 	} catch {
 		return [];
 	}
+}
+
+/** @deprecated Use getCrossReferences instead */
+export async function getLinkedPullRequests(
+	owner: string,
+	repo: string,
+	issueNumber: number,
+): Promise<LinkedPullRequest[]> {
+	const refs = await getCrossReferences(owner, repo, issueNumber);
+	return refs
+		.filter((r) => r.isPullRequest)
+		.map((r) => ({
+			number: r.number,
+			title: r.title,
+			state: r.state,
+			merged: r.merged,
+			user: r.user,
+			html_url: r.html_url,
+			repoOwner: r.repoOwner,
+			repoName: r.repoName,
+		}));
 }
 
 export async function getRepoIssues(
@@ -2945,9 +3101,28 @@ const ISSUES_PAGE_GRAPHQL = `
 	}
 `;
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function mapGraphQLIssueNode(node: Record<string, any>): RepoIssueNode {
-	const author = node.author as { login: string; avatarUrl: string } | null;
+// ── GraphQL Issue node types ──
+
+interface GQLIssueNode {
+	databaseId: number;
+	number: number;
+	title: string;
+	state: string;
+	stateReason: string | null;
+	updatedAt: string;
+	createdAt: string;
+	closedAt: string | null;
+	author: { login: string; avatarUrl: string } | null;
+	comments?: { totalCount: number };
+	labels?: { nodes: { name: string; color: string }[] };
+	assignees?: { nodes: { login: string; avatarUrl: string }[] };
+	milestone?: { title: string } | null;
+	reactions?: { totalCount: number };
+	thumbsUp?: { totalCount: number };
+}
+
+function mapGraphQLIssueNode(node: GQLIssueNode): RepoIssueNode {
+	const author = node.author;
 	const stateReasonMap: Record<string, string> = {
 		COMPLETED: "completed",
 		NOT_PLANNED: "not_planned",
@@ -2957,18 +3132,18 @@ function mapGraphQLIssueNode(node: Record<string, any>): RepoIssueNode {
 		id: node.databaseId,
 		number: node.number,
 		title: node.title,
-		state: (node.state as string).toLowerCase(),
+		state: node.state.toLowerCase(),
 		state_reason: node.stateReason ? (stateReasonMap[node.stateReason] ?? null) : null,
 		updated_at: node.updatedAt,
 		created_at: node.createdAt,
 		closed_at: node.closedAt ?? null,
 		comments: node.comments?.totalCount ?? 0,
 		user: author ? { login: author.login, avatar_url: author.avatarUrl } : null,
-		labels: (node.labels?.nodes ?? []).map((l: any) => ({
+		labels: (node.labels?.nodes ?? []).map((l) => ({
 			name: l.name,
 			color: l.color,
 		})),
-		assignees: (node.assignees?.nodes ?? []).map((a: any) => ({
+		assignees: (node.assignees?.nodes ?? []).map((a) => ({
 			login: a.login,
 			avatar_url: a.avatarUrl,
 		})),
@@ -2979,7 +3154,6 @@ function mapGraphQLIssueNode(node: Record<string, any>): RepoIssueNode {
 		},
 	};
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 async function fetchRepoIssuesPageGraphQL(
 	token: string,
@@ -4560,7 +4734,6 @@ function mapViewerPermission(perm: string | null): RepoPermissions {
 	};
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 async function fetchRepoPageDataGraphQL(
 	token: string,
 	owner: string,
@@ -4682,7 +4855,7 @@ async function fetchRepoPageDataGraphQL(
 	return {
 		repoData: {
 			description: r.description ?? undefined,
-			topics: (r.repositoryTopics?.nodes ?? []).map((n: any) => n.topic.name),
+			topics: (r.repositoryTopics?.nodes ?? []).map((n: { topic: { name: string } }) => n.topic.name),
 			stargazers_count: r.stargazerCount ?? 0,
 			forks_count: r.forkCount ?? 0,
 			subscribers_count: r.watchers?.totalCount ?? 0,
@@ -4728,7 +4901,6 @@ async function fetchRepoPageDataGraphQL(
 		latestCommit,
 	};
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export const getRepoPageData = cache(
 	async (owner: string, repo: string): Promise<RepoPageDataResult> => {
@@ -4973,7 +5145,37 @@ export interface AuthorDossierResult {
 	};
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// ── GraphQL Author Dossier response types ──
+
+interface GQLDossierUser {
+	login: string;
+	name: string | null;
+	avatarUrl: string;
+	bio: string | null;
+	company: string | null;
+	location: string | null;
+	websiteUrl: string | null;
+	twitterUsername: string | null;
+	repositories: { totalCount: number };
+	followers: { totalCount: number };
+	following: { totalCount: number };
+	createdAt: string;
+	__typename: string;
+	topRepositories?: { nodes: { name: string; nameWithOwner: string; stargazerCount: number; primaryLanguage?: { name: string } | null }[] };
+	organizations?: { nodes: { login: string; avatarUrl: string }[] };
+}
+
+interface GQLDossierResponse {
+	data?: {
+		user?: GQLDossierUser;
+		openPrs?: { issueCount: number };
+		mergedPrs?: { issueCount: number };
+		closedPrs?: { issueCount: number };
+		issues?: { issueCount: number };
+		reviews?: { issueCount: number };
+	};
+}
+
 export async function getAuthorDossier(
 	owner: string,
 	repo: string,
@@ -5033,17 +5235,17 @@ export async function getAuthorDossier(
 		});
 
 		if (!response.ok) return null;
-		const json = await response.json();
+		const json: GQLDossierResponse = await response.json();
 		const u = json.data?.user;
 		if (!u) return null;
 
 		const orgs: { login: string; avatar_url: string }[] = (
 			u.organizations?.nodes ?? []
-		).map((o: any) => ({
+		).map((o) => ({
 			login: o.login,
 			avatar_url: o.avatarUrl,
 		}));
-		const topRepos = (u.topRepositories?.nodes ?? []).map((r: any) => ({
+		const topRepos = (u.topRepositories?.nodes ?? []).map((r) => ({
 			name: r.name,
 			full_name: r.nameWithOwner,
 			stargazers_count: r.stargazerCount ?? 0,
@@ -5080,7 +5282,7 @@ export async function getAuthorDossier(
 			contributionCount,
 			isOrgMember,
 			isOwner: authorLogin.toLowerCase() === owner.toLowerCase(),
-			topRepoStars: topRepos.map((r: any) => r.stargazers_count),
+			topRepoStars: topRepos.map((r) => r.stargazers_count),
 		});
 
 		const result = {
@@ -5119,4 +5321,3 @@ export async function getAuthorDossier(
 		return null;
 	}
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */

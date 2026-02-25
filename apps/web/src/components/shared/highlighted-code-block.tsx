@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, memo } from "react";
-import type { Highlighter } from "shiki";
+import type { Highlighter, BundledLanguage } from "shiki";
 
 let highlighterInstance: Highlighter | null = null;
 let highlighterPromise: Promise<Highlighter> | null = null;
@@ -40,22 +40,14 @@ export const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
 				const highlighter = await getClientHighlighter();
 				const loaded = highlighter.getLoadedLanguages();
 				let effectiveLang = lang;
-				if (!(loaded as string[]).includes(lang)) {
+				if (!loaded.includes(lang)) {
 					try {
-						await highlighter.loadLanguage(
-							lang as Parameters<
-								Highlighter["loadLanguage"]
-							>[0],
-						);
+						await highlighter.loadLanguage(lang as BundledLanguage);
 					} catch {
 						effectiveLang = "text";
-						if (!(loaded as string[]).includes("text")) {
+						if (!loaded.includes("text")) {
 							try {
-								await highlighter.loadLanguage(
-									"text" as Parameters<
-										Highlighter["loadLanguage"]
-									>[0],
-								);
+								await highlighter.loadLanguage("text" as BundledLanguage);
 							} catch {}
 						}
 					}

@@ -1,4 +1,4 @@
-import { createHighlighter, type Highlighter } from "shiki";
+import { createHighlighter, type Highlighter, type BundledLanguage, type BundledTheme } from "shiki";
 import { parseDiffPatch, getLanguageFromFilename } from "./github-utils";
 import { getBuiltInTheme } from "./code-themes/built-in";
 import { DEFAULT_CODE_THEME_LIGHT, DEFAULT_CODE_THEME_DARK } from "./code-themes/types";
@@ -55,13 +55,13 @@ async function readThemePrefsFromCookie(): Promise<{ light: string; dark: string
  */
 async function ensureThemeLoaded(highlighter: Highlighter, themeId: string): Promise<string> {
 	const loaded = highlighter.getLoadedThemes();
-	if (loaded.includes(themeId as any)) return themeId;
+	if (loaded.includes(themeId)) return themeId;
 
 	// Check if it's a built-in Shiki theme
 	const builtIn = getBuiltInTheme(themeId);
 	if (builtIn) {
 		try {
-			await highlighter.loadTheme(themeId as any);
+			await highlighter.loadTheme(themeId as BundledTheme);
 			return themeId;
 		} catch {
 			// Fall through to fallback
@@ -132,13 +132,13 @@ export async function highlightCode(code: string, lang: string): Promise<string>
 	// Lazy-load the language if not already loaded
 	const loaded = highlighter.getLoadedLanguages();
 	const target = lang || "text";
-	if (!loaded.includes(target as any)) {
+	if (!loaded.includes(target)) {
 		try {
-			await highlighter.loadLanguage(target as any);
+			await highlighter.loadLanguage(target as BundledLanguage);
 		} catch {
 			// Fall back to text if language isn't supported
-			if (!loaded.includes("text" as any)) {
-				await highlighter.loadLanguage("text" as any);
+			if (!loaded.includes("text")) {
+				await highlighter.loadLanguage("text" as BundledLanguage);
 			}
 			return highlighter.codeToHtml(code, {
 				lang: "text",
@@ -172,14 +172,14 @@ export interface SyntaxToken {
 async function loadLang(lang: string): Promise<string> {
 	const highlighter = await getHighlighter();
 	const loaded = highlighter.getLoadedLanguages();
-	if (loaded.includes(lang as any)) return lang;
+	if (loaded.includes(lang)) return lang;
 	try {
-		await highlighter.loadLanguage(lang as any);
+		await highlighter.loadLanguage(lang as BundledLanguage);
 		return lang;
 	} catch {
-		if (!loaded.includes("text" as any)) {
+		if (!loaded.includes("text")) {
 			try {
-				await highlighter.loadLanguage("text" as any);
+				await highlighter.loadLanguage("text" as BundledLanguage);
 			} catch {}
 		}
 		return "text";
@@ -200,12 +200,12 @@ export async function highlightFullFile(code: string, filename: string): Promise
 
 	try {
 		const tokenResult = highlighter.codeToTokens(code, {
-			lang: effectiveLang as any,
+			lang: effectiveLang as BundledLanguage,
 			themes: { light: themes.light, dark: themes.dark },
 		});
 
 		return tokenResult.tokens.map((lineTokens) =>
-			lineTokens.map((t: any) => ({
+			lineTokens.map((t) => ({
 				text: t.content,
 				lightColor: t.htmlStyle?.color || "",
 				darkColor: t.htmlStyle?.["--shiki-dark"] || "",
@@ -255,12 +255,12 @@ export async function highlightDiffLines(
 		if (code.length > MAX_TOKENIZE_LENGTH) return;
 		try {
 			const tokenResult = highlighter.codeToTokens(code, {
-				lang: effectiveLang as any,
+				lang: effectiveLang as BundledLanguage,
 				themes: { light: themes.light, dark: themes.dark },
 			});
 			tokenResult.tokens.forEach((lineTokens, i) => {
 				if (i < stream.length) {
-					result[stream[i].key] = lineTokens.map((t: any) => ({
+					result[stream[i].key] = lineTokens.map((t) => ({
 						text: t.content,
 						lightColor: t.htmlStyle?.color || "",
 						darkColor: t.htmlStyle?.["--shiki-dark"] || "",

@@ -12,11 +12,17 @@ import { CodeThemeProvider } from "@/components/theme/code-theme-provider";
 import { GitHubLinkInterceptor } from "@/components/shared/github-link-interceptor";
 import { MutationEventProvider } from "@/components/shared/mutation-event-provider";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { OnboardingOverlay } from "@/components/onboarding/onboarding-overlay";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
 	const session = await getServerSession();
-	if (!session) return redirect("/");
+	if (!session) {
+		const headersList = await headers();
+		const pathname = headersList.get("x-pathname") || "";
+		const redirectTo = pathname && pathname !== "/" ? `/?redirect=${encodeURIComponent(pathname)}` : "/";
+		return redirect(redirectTo);
+	}
 
 	const notifications = (await getNotifications(20)) as NotificationItem[];
 

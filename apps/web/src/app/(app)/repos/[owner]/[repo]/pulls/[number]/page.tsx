@@ -11,6 +11,7 @@ import {
 	getAuthorDossier,
 	type CheckStatus,
 	type AuthorDossierResult,
+	getCrossReferences,
 } from "@/lib/github";
 import { extractParticipants } from "@/lib/github-utils";
 import { highlightDiffLines, type SyntaxToken } from "@/lib/shiki";
@@ -81,12 +82,13 @@ export default async function PRDetailPage({
 	const sp = await searchParams;
 	const pullNumber = parseInt(numStr, 10);
 
-	const { bundle, files, repoData, currentUser, session } = await all({
+	const { bundle, files, repoData, currentUser, session, crossRefs } = await all({
 		bundle: () => getPullRequestBundle(owner, repo, pullNumber),
 		files: () => getPullRequestFiles(owner, repo, pullNumber),
 		repoData: () => getRepo(owner, repo),
 		currentUser: () => getAuthenticatedUser(),
 		session: async () => auth.api.getSession({ headers: await headers() }),
+		crossRefs: () => getCrossReferences(owner, repo, pullNumber),
 	});
 
 	if (!bundle) {
@@ -226,6 +228,7 @@ export default async function PRDetailPage({
 				body: rc.body || "",
 				path: rc.path || "",
 				line: rc.line,
+				diff_hunk: rc.diff_hunk,
 				created_at: rc.created_at,
 				reactions: rc.reactions,
 			});
@@ -422,6 +425,7 @@ export default async function PRDetailPage({
 									currentUser?.login
 							}
 							isPinned={prPinned}
+							crossRefs={crossRefs}
 							actions={
 								<div className="flex items-center gap-2">
 									{isOpen && (

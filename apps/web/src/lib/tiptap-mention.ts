@@ -13,7 +13,7 @@ export const CustomMention = Mention.extend({
 			avatar: {
 				default: null,
 				parseHTML: (el: HTMLElement) => el.getAttribute("data-avatar"),
-				renderHTML: (attrs: any) => {
+				renderHTML: (attrs: Record<string, string | null>) => {
 					if (!attrs.avatar) return {};
 					return { "data-avatar": attrs.avatar };
 				},
@@ -50,7 +50,7 @@ export const CustomMention = Mention.extend({
 		return {
 			...this.parent?.(),
 			markdown: {
-				serialize(state: any, node: any) {
+				serialize(state: { write: (text: string) => void }, node: { attrs: Record<string, string> }) {
 					state.write(`@${node.attrs.id || node.attrs.label || ""}`);
 				},
 				parse: {},

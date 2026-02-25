@@ -63,6 +63,7 @@ export interface ReviewCommentEntry {
 	body: string;
 	path: string;
 	line: number | null;
+	diff_hunk: string | null;
 	created_at: string;
 	reactions?: Reactions;
 }

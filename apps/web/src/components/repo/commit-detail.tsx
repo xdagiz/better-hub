@@ -21,6 +21,7 @@ import {
 	Copy,
 	Check,
 	GitCommitHorizontal,
+	Link2,
 } from "lucide-react";
 import { ResizeHandle } from "@/components/ui/resize-handle";
 
@@ -114,6 +115,7 @@ export function CommitDetail({ owner, repo, commit, highlightData }: CommitDetai
 	const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
 	const [isDragging, setIsDragging] = useState(false);
 	const [copiedSha, setCopiedSha] = useState(false);
+	const [copiedLink, setCopiedLink] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -168,6 +170,13 @@ export function CommitDetail({ owner, repo, commit, highlightData }: CommitDetai
 		navigator.clipboard.writeText(commit.sha);
 		setCopiedSha(true);
 		setTimeout(() => setCopiedSha(false), 2000);
+	};
+
+	const copyLink = () => {
+		const url = `${window.location.origin}/${owner}/${repo}/commits/${commit.sha}`;
+		navigator.clipboard.writeText(url);
+		setCopiedLink(true);
+		setTimeout(() => setCopiedLink(false), 2000);
 	};
 
 	// Parse the commit message: first line is title, rest is body (excluding co-author trailers)
@@ -280,6 +289,7 @@ export function CommitDetail({ owner, repo, commit, highlightData }: CommitDetai
 					{/* SHA */}
 					<button
 						onClick={copySha}
+						title="Copy full SHA"
 						className="flex items-center gap-1 font-mono text-[11px] text-info hover:underline cursor-pointer"
 					>
 						{copiedSha ? (
@@ -288,6 +298,18 @@ export function CommitDetail({ owner, repo, commit, highlightData }: CommitDetai
 							<Copy className="w-3 h-3" />
 						)}
 						{commit.sha.slice(0, 7)}
+					</button>
+					<button
+						onClick={copyLink}
+						title="Copy commit link"
+						className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-info cursor-pointer transition-colors"
+					>
+						{copiedLink ? (
+							<Check className="w-3 h-3 text-info" />
+						) : (
+							<Link2 className="w-3 h-3" />
+						)}
+						{copiedLink ? "Copied!" : "Link"}
 					</button>
 
 					{/* Parents */}

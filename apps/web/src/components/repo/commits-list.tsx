@@ -19,6 +19,7 @@ import { TimeAgo } from "@/components/ui/time-ago";
 import { ResizeHandle } from "@/components/ui/resize-handle";
 import {
 	fetchCommitsByDate,
+	fetchCommitsPage,
 	fetchCommitDetail,
 	type CommitDetailData,
 } from "@/app/(app)/repos/[owner]/[repo]/commits/actions";
@@ -614,6 +615,9 @@ function CommitDetailSheet({
 	);
 }
 
+// Constants
+const PER_PAGE = 30;
+
 // Main component
 export function CommitsList({ owner, repo, commits, defaultBranch, branches }: CommitsListProps) {
 	// Filter state
@@ -623,6 +627,12 @@ export function CommitsList({ owner, repo, commits, defaultBranch, branches }: C
 	const [currentBranch, setCurrentBranch] = useState(defaultBranch);
 	const [displayedCommits, setDisplayedCommits] = useState<Commit[]>(commits);
 	const [isPending, startTransition] = useTransition();
+
+	// Infinite scroll state
+	const [page, setPage] = useState(1);
+	const [hasMore, setHasMore] = useState(commits.length >= PER_PAGE);
+	const [isLoadingMore, setIsLoadingMore] = useState(false);
+	const loadMoreRef = useRef<HTMLDivElement>(null);
 
 	// UI state
 	const [copiedSha, setCopiedSha] = useState<string | null>(null);
@@ -652,6 +662,44 @@ export function CommitsList({ owner, repo, commits, defaultBranch, branches }: C
 			}
 		}
 	}, []);
+
+	// Infinite scroll: load next page
+	const loadMore = useCallback(async () => {
+		if (isLoadingMore || !hasMore) return;
+		setIsLoadingMore(true);
+		const nextPage = page + 1;
+		const result = await fetchCommitsPage(
+			owner,
+			repo,
+			nextPage,
+			currentBranch,
+			since || undefined,
+			until || undefined,
+		);
+		const newCommits = result as Commit[];
+		if (newCommits.length < PER_PAGE) {
+			setHasMore(false);
+		}
+		setDisplayedCommits((prev) => [...prev, ...newCommits]);
+		setPage(nextPage);
+		setIsLoadingMore(false);
+	}, [isLoadingMore, hasMore, page, owner, repo, currentBranch, since, until]);
+
+	// IntersectionObserver for infinite scroll
+	useEffect(() => {
+		const el = loadMoreRef.current;
+		if (!el) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting) {
+					loadMore();
+				}
+			},
+			{ rootMargin: "400px" },
+		);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [loadMore]);
 
 	// Cookie helpers
 	const saveSheetWidthCookie = useCallback((width: number | null) => {
@@ -695,7 +743,10 @@ export function CommitsList({ owner, repo, commits, defaultBranch, branches }: C
 						: undefined,
 					branch,
 				);
-				setDisplayedCommits(result as Commit[]);
+				const data = result as Commit[];
+				setDisplayedCommits(data);
+				setPage(1);
+				setHasMore(data.length >= PER_PAGE);
 			});
 		},
 		[owner, repo],
@@ -721,6 +772,8 @@ export function CommitsList({ owner, repo, commits, defaultBranch, branches }: C
 			setCurrentBranch(branch);
 			if (branch === defaultBranch && !since && !until) {
 				setDisplayedCommits(commits);
+				setPage(1);
+				setHasMore(commits.length >= PER_PAGE);
 			} else {
 				fetchCommits(branch, since, until);
 			}
@@ -733,6 +786,8 @@ export function CommitsList({ owner, repo, commits, defaultBranch, branches }: C
 			setSince(newSince);
 			if (!newSince && !until && currentBranch === defaultBranch) {
 				setDisplayedCommits(commits);
+				setPage(1);
+				setHasMore(commits.length >= PER_PAGE);
 			} else {
 				fetchCommits(currentBranch, newSince, until);
 			}
@@ -745,6 +800,8 @@ export function CommitsList({ owner, repo, commits, defaultBranch, branches }: C
 			setUntil(newUntil);
 			if (!since && !newUntil && currentBranch === defaultBranch) {
 				setDisplayedCommits(commits);
+				setPage(1);
+				setHasMore(commits.length >= PER_PAGE);
 			} else {
 				fetchCommits(currentBranch, since, newUntil);
 			}
@@ -757,6 +814,8 @@ export function CommitsList({ owner, repo, commits, defaultBranch, branches }: C
 		setUntil("");
 		if (currentBranch === defaultBranch) {
 			setDisplayedCommits(commits);
+			setPage(1);
+			setHasMore(commits.length >= PER_PAGE);
 		} else {
 			fetchCommits(currentBranch);
 		}
@@ -846,6 +905,18 @@ export function CommitsList({ owner, repo, commits, defaultBranch, branches }: C
 					onCopySha={copySha}
 				/>
 			))}
+
+			{/* Infinite scroll sentinel */}
+			{!search && (
+				<div ref={loadMoreRef} className="py-2">
+					{isLoadingMore && (
+						<div className="py-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+							<Loader2 className="w-3.5 h-3.5 animate-spin" />
+							Loading more commits...
+						</div>
+					)}
+				</div>
+			)}
 
 			<CommitDetailSheet
 				open={sheetOpen}

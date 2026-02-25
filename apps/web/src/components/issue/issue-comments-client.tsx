@@ -6,6 +6,7 @@ import {
 	IssueConversation,
 	type IssueTimelineEntry,
 	type IssueCommentEntry,
+	type IssueDescriptionEntry,
 } from "@/components/issue/issue-conversation";
 
 export interface IssueComment {
@@ -36,11 +37,13 @@ export function IssueCommentsClient({
 	repo,
 	issueNumber,
 	initialComments,
+	descriptionEntry,
 }: {
 	owner: string;
 	repo: string;
 	issueNumber: number;
 	initialComments: IssueComment[];
+	descriptionEntry: IssueDescriptionEntry;
 }) {
 	const { data: comments = initialComments } = useQuery({
 		queryKey: ["issue-comments", owner, repo, issueNumber],
@@ -51,15 +54,10 @@ export function IssueCommentsClient({
 		gcTime: 10 * 60 * 1000,
 	});
 
-	const entries: IssueTimelineEntry[] = toEntries(comments);
-
-	if (entries.length === 0) {
-		return (
-			<div className="flex items-center justify-center py-8 text-[11px] font-mono text-muted-foreground/30">
-				No comments yet
-			</div>
-		);
-	}
+	const entries: IssueTimelineEntry[] = [
+		descriptionEntry,
+		...toEntries(comments),
+	];
 
 	return (
 		<IssueConversation

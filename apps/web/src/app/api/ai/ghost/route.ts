@@ -1033,7 +1033,7 @@ Only GET requests are allowed. For mutations use the dedicated tools.`,
 				return {
 					success: true,
 					requested_reviewers: (data.requested_reviewers || []).map(
-						(r: any) => r.login,
+						(r: { login: string }) => r.login,
 					),
 				};
 			},
@@ -1109,7 +1109,7 @@ Only GET requests are allowed. For mutations use the dedicated tools.`,
 				});
 				return {
 					success: true,
-					assignees: (data.assignees || []).map((a: any) => a.login),
+					assignees: (data.assignees || []).map((a: { login: string }) => a.login),
 				};
 			},
 		}),
@@ -1134,7 +1134,7 @@ Only GET requests are allowed. For mutations use the dedicated tools.`,
 				return {
 					success: true,
 					remaining_assignees: (data.assignees || []).map(
-						(a: any) => a.login,
+						(a: { login: string }) => a.login,
 					),
 				};
 			},
@@ -2362,8 +2362,8 @@ function getMergeConflictTools(octokit: Octokit, commitAuthor?: CommitAuthor) {
 
 					// 2. For modified files, read both versions
 					const conflictFiles = await Promise.all(
-						files.slice(0, 20).map(async (f: any) => {
-							const result: any = {
+						files.slice(0, 20).map(async (f: { filename: string; status: string }) => {
+							const result: { path: string; status: string; baseContent?: string | null; headContent?: string | null } = {
 								path: f.filename,
 								status: f.status,
 							};

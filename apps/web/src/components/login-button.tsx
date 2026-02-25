@@ -168,7 +168,7 @@ function InfoPopover({ text, children }: { text: string; children: React.ReactNo
 
 /* ── Component ── */
 
-export function LoginButton() {
+export function LoginButton({ redirectTo }: { redirectTo?: string }) {
 	const [loading, setLoading] = useState(false);
 	const [selected, setSelected] = useState<Set<string>>(() => {
 		const initial = new Set<string>();
@@ -197,7 +197,7 @@ export function LoginButton() {
 		}
 		signIn.social({
 			provider: "github",
-			callbackURL: "/dashboard",
+			callbackURL: redirectTo || "/dashboard",
 			scopes,
 		});
 	}

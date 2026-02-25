@@ -479,6 +479,7 @@ export function PRsList({
 			.filter((pr) => {
 				if (q) {
 					const matchesSearch =
+						pr.number.toString().includes(q) ||
 						pr.title.toLowerCase().includes(q) ||
 						pr.user?.login.toLowerCase().includes(q) ||
 						(pr.head?.ref?.toLowerCase().includes(q) ??

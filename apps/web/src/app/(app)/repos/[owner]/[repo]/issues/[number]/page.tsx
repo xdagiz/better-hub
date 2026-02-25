@@ -3,7 +3,7 @@ import {
 	getIssue,
 	getIssueComments,
 	getRepo,
-	getLinkedPullRequests,
+	getCrossReferences,
 	getAuthenticatedUser,
 } from "@/lib/github";
 import { extractParticipants } from "@/lib/github-utils";
@@ -11,7 +11,7 @@ import { renderMarkdownToHtml } from "@/components/shared/markdown-renderer";
 import { IssueHeader } from "@/components/issue/issue-header";
 import { IssueDetailLayout } from "@/components/issue/issue-detail-layout";
 import { ChatPageActivator } from "@/components/shared/chat-page-activator";
-import { IssueConversation, type IssueTimelineEntry } from "@/components/issue/issue-conversation";
+import type { IssueTimelineEntry } from "@/components/issue/issue-conversation";
 import { IssueCommentsClient, type IssueComment } from "@/components/issue/issue-comments-client";
 import { IssueCommentForm } from "@/components/issue/issue-comment-form";
 import { IssueSidebar } from "@/components/issue/issue-sidebar";
@@ -49,11 +49,11 @@ export default async function IssueDetailPage({
 	const issueNumber = parseInt(numStr, 10);
 
 	const hdrs = await headers();
-	const [issue, rawComments, repoData, linkedPRs, currentUser, session] = await Promise.all([
+	const [issue, rawComments, repoData, crossRefs, currentUser, session] = await Promise.all([
 		getIssue(owner, repo, issueNumber),
 		getIssueComments(owner, repo, issueNumber),
 		getRepo(owner, repo),
-		getLinkedPullRequests(owner, repo, issueNumber),
+		getCrossReferences(owner, repo, issueNumber),
 		getAuthenticatedUser(),
 		auth.api.getSession({ headers: hdrs }),
 	]);
@@ -181,25 +181,17 @@ export default async function IssueDetailPage({
 						)}
 						owner={owner}
 						repo={repo}
-						linkedPRs={linkedPRs}
+						crossRefs={crossRefs}
 						isPinned={issuePinned}
 					/>
 				}
-				description={
-					<IssueConversation
-						entries={[descriptionEntry]}
-						owner={owner}
-						repo={repo}
-						issueNumber={issueNumber}
-					/>
-				}
-				panelHeader={<IssueParticipants participants={participants} />}
-				conversationPanel={
+				timeline={
 					<IssueCommentsClient
 						owner={owner}
 						repo={repo}
 						issueNumber={issueNumber}
 						initialComments={commentsWithHtml}
+						descriptionEntry={descriptionEntry}
 					/>
 				}
 				commentForm={
@@ -223,28 +215,57 @@ export default async function IssueDetailPage({
 					/>
 				}
 				sidebar={
-					<IssueSidebar
-						assignees={(
-							(
-								issue as {
-									assignees?: Array<{
-										login: string;
-										avatar_url: string;
-									}>;
-								}
-							).assignees || []
-						).map((a) => ({
-							login: a.login,
-							avatar_url: a.avatar_url,
-						}))}
-						milestone={
-							(
-								issue.milestone as {
-									title?: string;
-								} | null
-							)?.title ?? null
-						}
-					/>
+					<>
+						<IssueSidebar
+							assignees={(
+								(
+									issue as {
+										assignees?: Array<{
+											login: string;
+											avatar_url: string;
+										}>;
+									}
+								).assignees || []
+							).map((a) => ({
+								login: a.login,
+								avatar_url: a.avatar_url,
+							}))}
+							labels={(issue.labels || []).map((l) =>
+								typeof l === "string"
+									? { name: l }
+									: {
+											name: l.name,
+											color:
+												l.color ??
+												undefined,
+										},
+							)}
+							milestone={
+								issue.milestone
+									? {
+											title: (issue.milestone as { title: string }).title,
+											description: (issue.milestone as { description?: string | null }).description ?? null,
+											open_issues: (issue.milestone as { open_issues?: number }).open_issues,
+											closed_issues: (issue.milestone as { closed_issues?: number }).closed_issues,
+										}
+									: null
+							}
+							state={issue.state}
+							stateReason={(issue as { state_reason?: string | null }).state_reason ?? null}
+							createdAt={issue.created_at}
+							updatedAt={(issue as { updated_at?: string }).updated_at}
+							closedAt={(issue as { closed_at?: string | null }).closed_at ?? null}
+							closedBy={
+								(issue as { closed_by?: { login: string; avatar_url: string } | null }).closed_by ?? null
+							}
+							locked={(issue as { locked?: boolean }).locked ?? false}
+							activeLockReason={(issue as { active_lock_reason?: string | null }).active_lock_reason ?? null}
+							crossRefs={crossRefs}
+							owner={owner}
+							repo={repo}
+						/>
+						<IssueParticipants participants={participants} />
+					</>
 				}
 			/>
 			<ChatPageActivator
