@@ -3315,7 +3315,11 @@ interface GQLDiscussionCommentNode {
 
 function mapGQLAuthor(author: { login: string; avatarUrl: string; __typename?: string } | null) {
 	return author
-		? { login: author.login, avatar_url: author.avatarUrl, type: author.__typename === "Bot" ? "Bot" : "User" }
+		? {
+				login: author.login,
+				avatar_url: author.avatarUrl,
+				type: author.__typename === "Bot" ? "Bot" : "User",
+			}
 		: null;
 }
 
@@ -3383,14 +3387,26 @@ async function fetchRepoDiscussionsPageGraphQL(
 	const json = await response.json();
 	const r = json.data?.repository;
 	if (!r) {
-		return { discussions: [], totalCount: 0, categories: [], hasNextPage: false, endCursor: null };
+		return {
+			discussions: [],
+			totalCount: 0,
+			categories: [],
+			hasNextPage: false,
+			endCursor: null,
+		};
 	}
 
 	return {
 		discussions: (r.discussions?.nodes ?? []).map(mapGQLDiscussionNode),
 		totalCount: r.discussions?.totalCount ?? 0,
 		categories: (r.discussionCategories?.nodes ?? []).map(
-			(c: { id: string; name: string; emoji: string; description: string; isAnswerable: boolean }) => ({
+			(c: {
+				id: string;
+				name: string;
+				emoji: string;
+				description: string;
+				isAnswerable: boolean;
+			}) => ({
 				id: c.id,
 				name: c.name,
 				emoji: c.emoji,
@@ -3447,7 +3463,9 @@ async function fetchDiscussionDetailGraphQL(
 		})),
 	};
 
-	const comments: DiscussionComment[] = (d.comments?.nodes ?? []).map(mapGQLDiscussionComment);
+	const comments: DiscussionComment[] = (d.comments?.nodes ?? []).map(
+		mapGQLDiscussionComment,
+	);
 
 	return { detail, comments };
 }

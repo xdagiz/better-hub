@@ -8,10 +8,7 @@ import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { LabelBadge } from "@/components/shared/label-badge";
 import { loadMoreDiscussions } from "@/app/(app)/repos/[owner]/[repo]/discussions/actions";
-import type {
-	RepoDiscussionNode,
-	DiscussionCategory,
-} from "@/lib/github";
+import type { RepoDiscussionNode, DiscussionCategory } from "@/lib/github";
 
 type TabState = "all" | "answered" | "unanswered";
 
@@ -81,9 +78,7 @@ export function DiscussionsList({
 		if (tab === "answered") {
 			items = items.filter((d) => d.isAnswered);
 		} else if (tab === "unanswered") {
-			items = items.filter(
-				(d) => d.category.isAnswerable && !d.isAnswered,
-			);
+			items = items.filter((d) => d.category.isAnswerable && !d.isAnswered);
 		}
 
 		if (selectedCategory) {
@@ -134,7 +129,8 @@ export function DiscussionsList({
 							key={cat.id}
 							onClick={() =>
 								setSelectedCategory(
-									selectedCategory === cat.name
+									selectedCategory ===
+										cat.name
 										? null
 										: cat.name,
 								)

@@ -49,7 +49,7 @@
 			"oxfmt --write",
 			"oxlint --fix"
 		],
-		"*.{json,yaml,yml}": [
+		"*.json": [
 			"oxfmt --write"
 		]
 	},

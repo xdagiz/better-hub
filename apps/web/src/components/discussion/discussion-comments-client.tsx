@@ -33,10 +33,5 @@ export function DiscussionCommentsClient({
 		gcTime: 10 * 60 * 1000,
 	});
 
-	return (
-		<DiscussionConversation
-			description={descriptionEntry}
-			comments={comments}
-		/>
-	);
+	return <DiscussionConversation description={descriptionEntry} comments={comments} />;
 }

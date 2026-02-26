@@ -1,9 +1,5 @@
 import type { Metadata } from "next";
-import {
-	getDiscussion,
-	getDiscussionComments,
-	getAuthenticatedUser,
-} from "@/lib/github";
+import { getDiscussion, getDiscussionComments, getAuthenticatedUser } from "@/lib/github";
 import { extractParticipants } from "@/lib/github-utils";
 import { renderMarkdownToHtml } from "@/components/shared/markdown-renderer";
 import { DiscussionHeader } from "@/components/discussion/discussion-header";
@@ -115,7 +111,10 @@ export default async function DiscussionDetailPage({
 	// Extract participants
 	const participants = extractParticipants([
 		discussion.author
-			? { login: discussion.author.login, avatar_url: discussion.author.avatar_url }
+			? {
+					login: discussion.author.login,
+					avatar_url: discussion.author.avatar_url,
+				}
 			: null,
 		...rawComments.map((c) =>
 			c.author
@@ -168,9 +167,7 @@ export default async function DiscussionDetailPage({
 						(currentUser as { avatar_url?: string } | null)
 							?.avatar_url
 					}
-					userName={
-						(currentUser as { login?: string } | null)?.login
-					}
+					userName={(currentUser as { login?: string } | null)?.login}
 					participants={participants}
 				/>
 			}

@@ -18,7 +18,8 @@ export default async function DiscussionsListPage({
 }) {
 	const { owner, repo } = await params;
 
-	const { discussions, totalCount, categories, hasNextPage, endCursor } = await getRepoDiscussionsPage(owner, repo);
+	const { discussions, totalCount, categories, hasNextPage, endCursor } =
+		await getRepoDiscussionsPage(owner, repo);
 
 	return (
 		<DiscussionsList

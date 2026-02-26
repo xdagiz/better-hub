@@ -109,7 +109,9 @@ export function PromptList({ owner, repo, promptRequests }: PromptListProps) {
 
 	const filtered = useMemo(() => {
 		let list = promptRequests.filter((pr) =>
-			tab === "open" ? pr.status === "open" : pr.status === "accepted" || pr.status === "closed",
+			tab === "open"
+				? pr.status === "open"
+				: pr.status === "accepted" || pr.status === "closed",
 		);
 
 		if (search) {
@@ -298,7 +300,10 @@ export function PromptList({ owner, repo, promptRequests }: PromptListProps) {
 									<span className="text-sm text-foreground font-medium truncate group-hover:text-foreground/90">
 										{pr.title}
 									</span>
-									{(pr.status === "accepted" || pr.status === "closed") && (
+									{(pr.status ===
+										"accepted" ||
+										pr.status ===
+											"closed") && (
 										<span
 											className={cn(
 												"text-[10px] font-mono px-1.5 py-0.5 rounded-full shrink-0",
@@ -330,46 +335,43 @@ export function PromptList({ owner, repo, promptRequests }: PromptListProps) {
 							<div className="flex items-center gap-1 shrink-0">
 								<button
 									onClick={(e) =>
-										handleCopy(
-											e,
-											pr,
-										)
+										handleCopy(e, pr)
 									}
 									className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted/60 transition-all"
 									title="Copy prompt"
 								>
-									{copiedId ===
-									pr.id ? (
+									{copiedId === pr.id ? (
 										<Check className="w-3.5 h-3.5 text-green-400" />
 									) : (
 										<Copy className="w-3.5 h-3.5" />
 									)}
 								</button>
-								{pr.status === "open" && tab === "open" && (
-									<button
-										onClick={(
-											e,
-										) =>
-											handleClose(
+								{pr.status === "open" &&
+									tab === "open" && (
+										<button
+											onClick={(
 												e,
-												pr.id,
-											)
-										}
-										disabled={
-											closingId ===
-											pr.id
-										}
-										className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
-										title="Close prompt request"
-									>
-										{closingId ===
-										pr.id ? (
-											<Loader2 className="w-3.5 h-3.5 animate-spin" />
-										) : (
-											<X className="w-3.5 h-3.5" />
-										)}
-									</button>
-								)}
+											) =>
+												handleClose(
+													e,
+													pr.id,
+												)
+											}
+											disabled={
+												closingId ===
+												pr.id
+											}
+											className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+											title="Close prompt request"
+										>
+											{closingId ===
+											pr.id ? (
+												<Loader2 className="w-3.5 h-3.5 animate-spin" />
+											) : (
+												<X className="w-3.5 h-3.5" />
+											)}
+										</button>
+									)}
 							</div>
 						</Link>
 					))}

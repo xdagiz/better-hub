@@ -233,7 +233,17 @@ export function PromptDetail({
 				}),
 			);
 		}, 300);
-	}, [openChat, owner, repo, promptRequest.title, promptRequest.body, promptRequest.id, promptRequest.status, emit, router]);
+	}, [
+		openChat,
+		owner,
+		repo,
+		promptRequest.title,
+		promptRequest.body,
+		promptRequest.id,
+		promptRequest.status,
+		emit,
+		router,
+	]);
 
 	const isOpen = promptRequest.status === "open";
 	const isAccepted = promptRequest.status === "accepted";
@@ -283,7 +293,9 @@ export function PromptDetail({
 									Run with Ghost
 								</button>
 								<button
-									onClick={handleAcceptAndCopy}
+									onClick={
+										handleAcceptAndCopy
+									}
 									disabled={isAccepting}
 									className={cn(
 										"flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md border transition-all cursor-pointer disabled:opacity-50",
@@ -300,7 +312,8 @@ export function PromptDetail({
 									) : (
 										<>
 											<Copy className="w-3 h-3" />
-											Accept &amp; Copy
+											Accept &amp;
+											Copy
 										</>
 									)}
 								</button>
@@ -332,9 +345,11 @@ export function PromptDetail({
 						<div className="flex-1" />
 						{canManage && (
 							<>
-								{(isOpen || isAccepted) ? (
+								{isOpen || isAccepted ? (
 									<button
-										onClick={handleClose}
+										onClick={
+											handleClose
+										}
 										disabled={isClosing}
 										className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-muted-foreground/60 hover:text-foreground rounded-md hover:bg-muted/50 transition-colors disabled:opacity-50 cursor-pointer"
 									>
@@ -347,8 +362,12 @@ export function PromptDetail({
 									</button>
 								) : (
 									<button
-										onClick={handleReopen}
-										disabled={isReopening}
+										onClick={
+											handleReopen
+										}
+										disabled={
+											isReopening
+										}
 										className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-muted-foreground/60 hover:text-foreground rounded-md hover:bg-muted/50 transition-colors disabled:opacity-50 cursor-pointer"
 									>
 										{isReopening ? (
@@ -384,49 +403,81 @@ export function PromptDetail({
 
 						{optimisticComments.length > 0 && (
 							<div className="space-y-2">
-								{optimisticComments.map((comment) => (
-									<div
-										key={comment.id}
-										className={cn(
-											"border border-border/60 rounded-lg p-3 space-y-1.5",
-											comment.id.startsWith("optimistic-") && "opacity-60",
-										)}
-									>
-										<div className="flex items-center gap-2">
-											{comment.userAvatarUrl ? (
-												<Image
-													src={comment.userAvatarUrl}
-													alt={comment.userName}
-													width={18}
-													height={18}
-													className="rounded-full"
-												/>
-											) : (
-												<div className="w-[18px] h-[18px] rounded-full bg-muted" />
+								{optimisticComments.map(
+									(comment) => (
+										<div
+											key={
+												comment.id
+											}
+											className={cn(
+												"border border-border/60 rounded-lg p-3 space-y-1.5",
+												comment.id.startsWith(
+													"optimistic-",
+												) &&
+													"opacity-60",
 											)}
-											<span className="text-[11px] font-medium text-foreground">
-												{comment.userName}
-											</span>
-											<span className="text-[10px] text-muted-foreground/40 font-mono">
-												<TimeAgo date={comment.createdAt} />
-											</span>
-											<div className="flex-1" />
-											{currentUser?.id === comment.userId &&
-												!comment.id.startsWith("optimistic-") && (
-													<button
-														onClick={() => handleDeleteComment(comment.id)}
-														className="text-muted-foreground/20 hover:text-red-400 transition-colors cursor-pointer"
-														title="Delete comment"
-													>
-														<Trash2 className="w-2.5 h-2.5" />
-													</button>
+										>
+											<div className="flex items-center gap-2">
+												{comment.userAvatarUrl ? (
+													<Image
+														src={
+															comment.userAvatarUrl
+														}
+														alt={
+															comment.userName
+														}
+														width={
+															18
+														}
+														height={
+															18
+														}
+														className="rounded-full"
+													/>
+												) : (
+													<div className="w-[18px] h-[18px] rounded-full bg-muted" />
 												)}
+												<span className="text-[11px] font-medium text-foreground">
+													{
+														comment.userName
+													}
+												</span>
+												<span className="text-[10px] text-muted-foreground/40 font-mono">
+													<TimeAgo
+														date={
+															comment.createdAt
+														}
+													/>
+												</span>
+												<div className="flex-1" />
+												{currentUser?.id ===
+													comment.userId &&
+													!comment.id.startsWith(
+														"optimistic-",
+													) && (
+														<button
+															onClick={() =>
+																handleDeleteComment(
+																	comment.id,
+																)
+															}
+															className="text-muted-foreground/20 hover:text-red-400 transition-colors cursor-pointer"
+															title="Delete comment"
+														>
+															<Trash2 className="w-2.5 h-2.5" />
+														</button>
+													)}
+											</div>
+											<div className="pl-[26px]">
+												<ClientMarkdown
+													content={
+														comment.body
+													}
+												/>
+											</div>
 										</div>
-										<div className="pl-[26px]">
-											<ClientMarkdown content={comment.body} />
-										</div>
-									</div>
-								))}
+									),
+								)}
 							</div>
 						)}
 
@@ -439,7 +490,12 @@ export function PromptDetail({
 									compact
 									rows={2}
 									onKeyDown={(e) => {
-										if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+										if (
+											e.key ===
+												"Enter" &&
+											(e.metaKey ||
+												e.ctrlKey)
+										) {
 											e.preventDefault();
 											handleAddComment();
 										}
@@ -447,8 +503,13 @@ export function PromptDetail({
 								/>
 								<div className="flex justify-end">
 									<button
-										onClick={handleAddComment}
-										disabled={!commentBody.trim() || isSubmittingComment}
+										onClick={
+											handleAddComment
+										}
+										disabled={
+											!commentBody.trim() ||
+											isSubmittingComment
+										}
 										className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium bg-foreground text-background rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 cursor-pointer"
 									>
 										{isSubmittingComment ? (
@@ -489,7 +550,9 @@ export function PromptDetail({
 									Accepted by
 								</p>
 								<p className="text-[11px] text-blue-400 font-mono">
-									{promptRequest.acceptedByName}
+									{
+										promptRequest.acceptedByName
+									}
 								</p>
 							</div>
 						</>
@@ -515,7 +578,11 @@ export function PromptDetail({
 									Updated
 								</p>
 								<p className="text-[11px] text-muted-foreground/70 font-mono">
-									<TimeAgo date={promptRequest.updatedAt} />
+									<TimeAgo
+										date={
+											promptRequest.updatedAt
+										}
+									/>
 								</p>
 							</div>
 						</>

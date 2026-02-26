@@ -2,14 +2,7 @@
 
 import { useState, useTransition, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import {
-	Loader2,
-	X,
-	AlertCircle,
-	CornerDownLeft,
-	Sparkles,
-	ImagePlus,
-} from "lucide-react";
+import { Loader2, X, AlertCircle, CornerDownLeft, Sparkles, ImagePlus } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
@@ -87,16 +80,26 @@ export function SuggestPromptDialog({ owner, repo, open, onOpenChange }: Suggest
 					const before = body.slice(0, start);
 					const after = body.slice(end);
 					const needsNewline =
-						before.length > 0 && !before.endsWith("\n") ? "\n" : "";
-					const newBody = before + needsNewline + markdown + "\n" + after;
+						before.length > 0 && !before.endsWith("\n")
+							? "\n"
+							: "";
+					const newBody =
+						before + needsNewline + markdown + "\n" + after;
 					setBody(newBody);
 					requestAnimationFrame(() => {
 						ta.focus();
-						const cursor = (before + needsNewline + markdown + "\n").length;
+						const cursor = (
+							before +
+							needsNewline +
+							markdown +
+							"\n"
+						).length;
 						ta.setSelectionRange(cursor, cursor);
 					});
 				} else {
-					setBody((prev) => (prev ? prev + "\n" + markdown : markdown));
+					setBody((prev) =>
+						prev ? prev + "\n" + markdown : markdown,
+					);
 				}
 			} catch {
 				setError("Failed to upload image");
@@ -270,7 +273,8 @@ export function SuggestPromptDialog({ owner, repo, open, onOpenChange }: Suggest
 								onKeyDown={(e) => {
 									if (
 										e.key === "Enter" &&
-										(e.metaKey || e.ctrlKey)
+										(e.metaKey ||
+											e.ctrlKey)
 									) {
 										e.preventDefault();
 										handleSubmit();
@@ -292,11 +296,15 @@ export function SuggestPromptDialog({ owner, repo, open, onOpenChange }: Suggest
 							<div className="flex items-center gap-1">
 								<button
 									onClick={handleRewrite}
-									disabled={!body.trim() || isRewriting}
+									disabled={
+										!body.trim() ||
+										isRewriting
+									}
 									title="Rewrite with AI"
 									className={cn(
 										"flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] rounded-md transition-all cursor-pointer",
-										body.trim() && !isRewriting
+										body.trim() &&
+											!isRewriting
 											? "text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/5"
 											: "text-muted-foreground/20 cursor-not-allowed",
 									)}
@@ -309,7 +317,9 @@ export function SuggestPromptDialog({ owner, repo, open, onOpenChange }: Suggest
 									Rewrite
 								</button>
 								<button
-									onClick={() => fileInputRef.current?.click()}
+									onClick={() =>
+										fileInputRef.current?.click()
+									}
 									disabled={isUploading}
 									title="Upload image"
 									className={cn(
@@ -331,8 +341,13 @@ export function SuggestPromptDialog({ owner, repo, open, onOpenChange }: Suggest
 									accept="image/*"
 									className="hidden"
 									onChange={(e) => {
-										const file = e.target.files?.[0];
-										if (file) uploadFile(file);
+										const file =
+											e.target
+												.files?.[0];
+										if (file)
+											uploadFile(
+												file,
+											);
 										e.target.value = "";
 									}}
 								/>
@@ -353,7 +368,8 @@ export function SuggestPromptDialog({ owner, repo, open, onOpenChange }: Suggest
 									}
 									className={cn(
 										"flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer",
-										body.trim() && !isUploading
+										body.trim() &&
+											!isUploading
 											? "bg-foreground text-background hover:bg-foreground/90"
 											: "bg-muted dark:bg-white/5 text-muted-foreground/30 cursor-not-allowed",
 										"disabled:opacity-50 disabled:cursor-not-allowed",

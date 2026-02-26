@@ -26,7 +26,11 @@ export async function fetchDiscussionComments(
 			const repliesWithHtml = await Promise.all(
 				c.replies.map(async (r) => {
 					const replyHtml = r.body
-						? await renderMarkdownToHtml(r.body, undefined, refCtx)
+						? await renderMarkdownToHtml(
+								r.body,
+								undefined,
+								refCtx,
+							)
 						: "";
 					return { ...r, bodyHtml: replyHtml };
 				}),
@@ -46,11 +50,7 @@ export async function addDiscussionComment(
 	replyToId?: string,
 ): Promise<{ success?: boolean; error?: string }> {
 	try {
-		const result = await addDiscussionCommentViaGraphQL(
-			discussionId,
-			body,
-			replyToId,
-		);
+		const result = await addDiscussionCommentViaGraphQL(discussionId, body, replyToId);
 		if (!result) return { error: "Failed to add comment" };
 
 		await invalidateRepoDiscussionsCache(owner, repo);

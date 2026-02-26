@@ -39,9 +39,7 @@ export function DiscussionCommentForm({
 	const router = useRouter();
 	const [body, setBody] = useState("");
 	const [error, setError] = useState<string | null>(null);
-	const [optimisticComments, setOptimisticComments] = useState<
-		OptimisticComment[]
-	>([]);
+	const [optimisticComments, setOptimisticComments] = useState<OptimisticComment[]>([]);
 	const { emit } = useMutationEvents();
 
 	const handleSubmit = () => {
@@ -85,9 +83,7 @@ export function DiscussionCommentForm({
 				setTimeout(
 					() =>
 						setOptimisticComments((prev) =>
-							prev.filter(
-								(c) => c.id !== optimisticId,
-							),
+							prev.filter((c) => c.id !== optimisticId),
 						),
 					2000,
 				);

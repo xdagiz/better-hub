@@ -55,10 +55,7 @@ function groupComments(comments: DiscussionComment[]): GroupedItem[] {
 	return groups;
 }
 
-export function DiscussionConversation({
-	description,
-	comments,
-}: DiscussionConversationProps) {
+export function DiscussionConversation({ description, comments }: DiscussionConversationProps) {
 	const grouped = groupComments(comments);
 
 	return (
@@ -76,11 +73,17 @@ export function DiscussionConversation({
 				{grouped.map((item, gi) => {
 					if (item.kind === "bot-group") {
 						const botNames = [
-							...new Set(item.comments.map((c) => c.author!.login)),
+							...new Set(
+								item.comments.map(
+									(c) => c.author!.login,
+								),
+							),
 						];
 						const avatars = [
 							...new Set(
-								item.comments.map((c) => c.author!.avatar_url),
+								item.comments.map(
+									(c) => c.author!.avatar_url,
+								),
 							),
 						];
 						return (
@@ -94,21 +97,44 @@ export function DiscussionConversation({
 									avatars={avatars}
 								>
 									<div className="space-y-3">
-										{item.comments.map((comment) => (
-											<div key={comment.id}>
-												<CommentBlock comment={comment} />
-												{comment.replies.length > 0 && (
-													<div className="ml-12 mt-2 space-y-2 border-l-2 border-border/30 pl-4">
-														{comment.replies.map((reply) => (
-															<ReplyBlock
-																key={reply.id}
-																reply={reply}
-															/>
-														))}
-													</div>
-												)}
-											</div>
-										))}
+										{item.comments.map(
+											(
+												comment,
+											) => (
+												<div
+													key={
+														comment.id
+													}
+												>
+													<CommentBlock
+														comment={
+															comment
+														}
+													/>
+													{comment
+														.replies
+														.length >
+														0 && (
+														<div className="ml-12 mt-2 space-y-2 border-l-2 border-border/30 pl-4">
+															{comment.replies.map(
+																(
+																	reply,
+																) => (
+																	<ReplyBlock
+																		key={
+																			reply.id
+																		}
+																		reply={
+																			reply
+																		}
+																	/>
+																),
+															)}
+														</div>
+													)}
+												</div>
+											),
+										)}
 									</div>
 								</BotActivityGroup>
 							</div>
@@ -121,12 +147,18 @@ export function DiscussionConversation({
 							<CommentBlock comment={comment} />
 							{comment.replies.length > 0 && (
 								<div className="ml-12 mt-2 space-y-2 border-l-2 border-border/30 pl-4">
-									{comment.replies.map((reply) => (
-										<ReplyBlock
-											key={reply.id}
-											reply={reply}
-										/>
-									))}
+									{comment.replies.map(
+										(reply) => (
+											<ReplyBlock
+												key={
+													reply.id
+												}
+												reply={
+													reply
+												}
+											/>
+										),
+									)}
 								</div>
 							)}
 						</div>
@@ -325,9 +357,7 @@ function ReplyBlock({ reply }: { reply: DiscussionReply }) {
 		<div
 			className={cn(
 				"border rounded-md overflow-hidden",
-				reply.isAnswer
-					? "border-success/40"
-					: "border-border/40",
+				reply.isAnswer ? "border-success/40" : "border-border/40",
 			)}
 		>
 			{reply.isAnswer && (
@@ -367,9 +397,7 @@ function ReplyBlock({ reply }: { reply: DiscussionReply }) {
 					</span>
 				)}
 			</div>
-			{renderedBody && (
-				<div className="px-3 py-2">{renderedBody}</div>
-			)}
+			{renderedBody && <div className="px-3 py-2">{renderedBody}</div>}
 		</div>
 	);
 }

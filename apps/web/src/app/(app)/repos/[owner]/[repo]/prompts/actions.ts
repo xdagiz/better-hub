@@ -63,16 +63,16 @@ export async function acceptPromptRequestAction(id: string) {
 	revalidatePath(`/repos/${pr.owner}/${pr.repo}/prompts/${id}`);
 }
 
-export async function createPromptRequestAction(
-	owner: string,
-	repo: string,
-	body: string,
-) {
+export async function createPromptRequestAction(owner: string, repo: string, body: string) {
 	const session = await auth.api.getSession({ headers: await headers() });
 	if (!session?.user?.id) throw new Error("Unauthorized");
 
 	// Auto-generate title from first line of body
-	const firstLine = body.split("\n")[0]?.replace(/^#+\s*/, "").trim() || "Untitled prompt";
+	const firstLine =
+		body
+			.split("\n")[0]
+			?.replace(/^#+\s*/, "")
+			.trim() || "Untitled prompt";
 	const title = firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine;
 
 	const pr = await createPromptRequest(session.user.id, owner, repo, title, body);
